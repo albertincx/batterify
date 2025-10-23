@@ -1,0 +1,44 @@
+package com.example.appsapp.ui.running
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.example.appsapp.PackageKiller
+import com.example.appsapp.R
+import com.example.appsapp.RunningPackage
+
+class RunningPackagesAdapter(
+    private val runningPackages: List<RunningPackage>,
+    private val onKillClick: (RunningPackage) -> Unit
+) : RecyclerView.Adapter<RunningPackagesAdapter.RunningPackageViewHolder>() {
+
+    class RunningPackageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val appNameTextView: TextView = itemView.findViewById(R.id.appNameTextView)
+        val packageNameTextView: TextView = itemView.findViewById(R.id.packageNameTextView)
+        val processIdTextView: TextView = itemView.findViewById(R.id.processIdTextView)
+        val actionButton: Button = itemView.findViewById(R.id.actionButton)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RunningPackageViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_running_package, parent, false)
+        return RunningPackageViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: RunningPackageViewHolder, position: Int) {
+        val runningPackage = runningPackages[position]
+        
+        holder.appNameTextView.text = runningPackage.appName
+        holder.packageNameTextView.text = runningPackage.packageName
+        holder.processIdTextView.text = "PID: ${runningPackage.processId}"
+        
+        holder.actionButton.setOnClickListener {
+            onKillClick(runningPackage)
+        }
+    }
+
+    override fun getItemCount(): Int = runningPackages.size
+}

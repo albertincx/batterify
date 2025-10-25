@@ -1,5 +1,6 @@
 package com.example.appsapp
 
+import android.Manifest
 import android.app.ActivityManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -8,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 
 class PackageKiller {
@@ -23,27 +25,43 @@ class PackageKiller {
                 context.startActivity(intent)
                 return false
             }
-            
+
+            try {
+                val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+
+                // On newer Android versions, killing arbitrary background processes is restricted
+                // Try to kill background processes
+                activityManager.killBackgroundProcesses(packageName)
+
+                Toast.makeText(context, "Attempted to kill background processes for $packageName", Toast.LENGTH_SHORT).show()
+                return true
+            } catch (e: SecurityException) {
+                Toast.makeText(context, "Permission denied to kill processes: ${e.message}", Toast.LENGTH_LONG).show()
+                return false
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to kill package: ${e.message}", Toast.LENGTH_LONG).show()
+                return false
+            }
             // On modern Android (6.0+), the KILL_BACKGROUND_PROCESSES permission is only available to system apps
             // For regular apps, this will throw a SecurityException
             // So we'll just provide feedback to the user about what's happening
-            if (packageName == context.packageName) {
-                // If trying to kill the current app, we can use finishAndRemoveTask or similar
-                Toast.makeText(context, "Cannot kill current app from within itself", Toast.LENGTH_LONG).show()
-                return false
-            } else {
-                // For other packages, inform the user about the restriction
-                Toast.makeText(
-                    context, 
-                    "Modern Android doesn't allow apps to kill other apps' processes for security reasons. " +
-                    "Package '$packageName' may still be running.", 
-                    Toast.LENGTH_LONG
-                ).show()
-                
-                // Provide option to open app info instead
-                openAppInfo(context, packageName)
-                return false
-            }
+//            if (packageName == context.packageName) {
+//                // If trying to kill the current app, we can use finishAndRemoveTask or similar
+//                Toast.makeText(context, "Cannot kill current app from within itself", Toast.LENGTH_LONG).show()
+//                return false
+//            } else {
+//                // For other packages, inform the user about the restriction
+//                Toast.makeText(
+//                    context,
+//                    "Modern Android doesn't allow apps to kill other apps' processes for security reasons. " +
+//                    "Package '$packageName' may still be running.",
+//                    Toast.LENGTH_LONG
+//                ).show()
+//
+//                // Provide option to open app info instead
+//                openAppInfo(context, packageName)
+//                return false
+//            }
         }
         
         private fun hasUsageStatsPermission(context: Context): Boolean {
@@ -70,7 +88,35 @@ class PackageKiller {
                 false
             }
         }
-        
+        @RequiresPermission(Manifest.permission.KILL_BACKGROUND_PROCESSES)
+        fun forceStopPackage(context: Context, packageName: String): Boolean {
+            // This requires special system-level permissions or root access
+            // Only available on rooted devices or system apps
+            if (isSystemApp(context)) {
+                try {
+                    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    activityManager.killBackgroundProcesses(packageName)
+                    Toast.makeText(context, "Force stopped (background) $packageName", Toast.LENGTH_SHORT).show()
+                    return true
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to force stop: ${e.message}", Toast.LENGTH_LONG).show()
+                    return false
+                }
+            } else {
+                Toast.makeText(context, "Force stop requires system-level permissions", Toast.LENGTH_LONG).show()
+                return false
+            }
+        }
+
+        private fun isSystemApp(context: Context): Boolean {
+            return try {
+                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                val applicationInfo = packageInfo.applicationInfo
+                applicationInfo != null && ((applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0)
+            } catch (e: PackageManager.NameNotFoundException) {
+                false
+            }
+        }
         private fun openAppInfo(context: Context, packageName: String) {
             try {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -83,7 +129,7 @@ class PackageKiller {
             }
         }
         
-        fun forceStopPackage(context: Context, packageName: String): Boolean {
+        fun forceStopPackage1(context: Context, packageName: String): Boolean {
             // Modern Android doesn't allow regular apps to force stop other apps
             // Only system apps or apps with special permissions can do this
             Toast.makeText(

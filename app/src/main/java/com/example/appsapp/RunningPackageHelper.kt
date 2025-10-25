@@ -38,14 +38,19 @@ class RunningPackageHelper {
                         .take(50) // Take the 50 most recently used apps
                     
                     mostRecentStats.forEach { usageStat ->
-                        runningPackages.add(
-                            RunningPackage(
-                                packageName = usageStat.packageName,
-                                processName = usageStat.packageName,
-                                processId = -1, // UsageStats doesn't provide PID
-                                appName = getApplicationLabel(context, usageStat.packageName)
+                        if (
+                            !usageStat.packageName.startsWith("com.android")
+                            && !usageStat.packageName.startsWith("com.google.android")
+                        ) {
+                            runningPackages.add(
+                                RunningPackage(
+                                    packageName = usageStat.packageName,
+                                    processName = usageStat.packageName,
+                                    processId = -1, // UsageStats doesn't provide PID
+                                    appName = getApplicationLabel(context, usageStat.packageName)
+                                )
                             )
-                        )
+                        }
                     }
                 }
             } else {
@@ -65,16 +70,22 @@ class RunningPackageHelper {
             val appProcesses = activityManager.runningAppProcesses
             appProcesses?.forEach { processInfo ->
                 val packageName = processInfo.processName
-                // Only add if not already in the list from usage stats
-                if (!runningPackages.any { it.packageName == packageName }) {
-                    runningPackages.add(
-                        RunningPackage(
-                            packageName = packageName,
-                            processName = packageName,
-                            processId = processInfo.pid,
-                            appName = getApplicationLabel(context, packageName)
+                // Filter out system processes
+                if (!packageName.startsWith("com.android") 
+                    && !packageName.startsWith("com.google.android")
+                    && !packageName.startsWith("system:")
+                    && !packageName.startsWith("com.miui")) { // Additional filter for MIUI system apps
+                    // Only add if not already in the list from usage stats
+                    if (!runningPackages.any { it.packageName == packageName }) {
+                        runningPackages.add(
+                            RunningPackage(
+                                packageName = packageName,
+                                processName = packageName,
+                                processId = processInfo.pid,
+                                appName = getApplicationLabel(context, packageName)
+                            )
                         )
-                    )
+                    }
                 }
             }
             

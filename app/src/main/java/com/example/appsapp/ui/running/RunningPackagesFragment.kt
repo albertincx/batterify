@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.Toast
-import android.net.Uri
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -42,7 +41,8 @@ class RunningPackagesFragment : Fragment() {
     }
 
     private fun loadRunningPackages() {
-        val runningPackages = RunningPackageHelper.getRunningPackages(requireContext())
+        // Преобразуем полученный список в изменяемый список
+        val runningPackages = RunningPackageHelper.getRunningPackages(requireContext()).toMutableList()
         adapter = RunningPackagesAdapter(runningPackages) { runningPackage ->
             // On modern Android, we can't kill other packages, so open app info instead
             openAppInfo(runningPackage.packageName)

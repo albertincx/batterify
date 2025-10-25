@@ -7,7 +7,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.example.appsapp.PackageKiller
@@ -39,12 +38,12 @@ class HomeFragment : Fragment() {
         
         // Set up the kill package button using view binding
         binding.killPackageButton.setOnClickListener {
-            val packageName = binding.packageNameInput.text.toString().trim()
-            if (packageName.isNotEmpty()) {
-                PackageKiller.killPackage(requireContext(), packageName)
-            } else {
-                Toast.makeText(requireContext(), "Please enter a package name", Toast.LENGTH_SHORT).show()
+            var packageName = binding.packageNameInput.text.toString().trim()
+            if (packageName.isEmpty()) {
+                // Use a demo package if none is entered
+                packageName = "com.android.chrome" // Common example package
             }
+            PackageKiller.killPackage(requireContext(), packageName)
         }
         
         return root

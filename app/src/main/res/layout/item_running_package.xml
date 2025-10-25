@@ -40,23 +40,24 @@
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:textColor="#999999" />
+        <Button
+            android:id="@+id/hideButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_gravity="end"
+            android:text="Hide"
+            android:textSize="10sp" />
 
         <Button
-            android:id="@+id/``actionButton``"
+            android:id="@+id/actionButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
+            android:layout_marginStart="8dp"
             android:layout_gravity="end"
             android:text="Info"
-            android:textSize="12sp" />
-        <Button
-            android:id="@+id/killButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_gravity="end"
-            android:text="Kill"
-            android:textSize="12sp" />
+            android:textSize="10sp" />
+
 
     </LinearLayout>
 

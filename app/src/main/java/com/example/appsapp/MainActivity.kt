@@ -27,8 +27,9 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(binding.appBarMain.toolbar)
 
         binding.appBarMain.fab.setOnClickListener { view ->
-            // Updated to show that killing other packages isn't possible on modern Android
-            com.example.appsapp.PackageKiller.killPackage(this, this.packageName) // Try to kill current app as example
+            // For the FAB, we can implement a quick kill of a commonly used package as a demo
+            // Or we could prompt for package name
+            com.example.appsapp.PackageKiller.killPackage(this, "com.android.chrome") // Example package
         }
         val drawerLayout: DrawerLayout = binding.drawerLayout
         val navView: NavigationView = binding.navView

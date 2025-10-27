@@ -11,7 +11,8 @@ data class RunningPackage(
     val packageName: String,
     val processName: String,
     val processId: Int,
-    val appName: String
+    val appName: String,
+    var isVisible: Boolean = true
 )
 
 class RunningPackageHelper {
@@ -47,7 +48,8 @@ class RunningPackageHelper {
                                     packageName = usageStat.packageName,
                                     processName = usageStat.packageName,
                                     processId = -1, // UsageStats doesn't provide PID
-                                    appName = getApplicationLabel(context, usageStat.packageName)
+                                    appName = getApplicationLabel(context, usageStat.packageName),
+                                    isVisible = true
                                 )
                             )
                         }
@@ -60,7 +62,8 @@ class RunningPackageHelper {
                         packageName = context.packageName,
                         processName = context.packageName,
                         processId = android.os.Process.myPid(),
-                        appName = getApplicationLabel(context, context.packageName)
+                        appName = getApplicationLabel(context, context.packageName),
+                        isVisible = true
                     )
                 )
             }
@@ -82,7 +85,8 @@ class RunningPackageHelper {
                                 packageName = packageName,
                                 processName = packageName,
                                 processId = processInfo.pid,
-                                appName = getApplicationLabel(context, packageName)
+                                appName = getApplicationLabel(context, packageName),
+                                isVisible = true
                             )
                         )
                     }

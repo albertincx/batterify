@@ -8,7 +8,11 @@
 - [x] Update `RunningPackagesFragment` to use the new queue-based freezing
 - [x] Debug and fix "Force Stop" click logic
 - [x] Implement "anti-loop" protection and user interruption handling
-    - [x] Add state tracking (`currentPackage`, `mainButtonClicked`)
-    - [x] Handle "Cancel" button to stop automation
-    - [x] Prevent multiple clicks on the same main button
-- [x] Verify fix on device
+- [x] Fix dialog confirmation on Pixel 6a
+- [/] Disable checkbox for frozen apps
+    - [ ] Update `RunningPackage` data model
+    - [ ] Create `FreezeStatusObserver` for cross-component communication
+    - [ ] Notify observer from `FreezeAccessibilityService`
+    - [ ] Update `RunningPackagesAdapter` to disable checkboxes
+    - [ ] Observe updates in `RunningPackagesFragment`
+- [ ] Verify fix on device

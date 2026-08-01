@@ -1,29 +1,38 @@
-# Fixing Accessibility Service Infinite Loop and User Interruption
+# Disabling Checkbox for Frozen Applications
 
-The `FreezeAccessibilityService` currently enters an infinite loop if the user cancels a "Force Stop" dialog, because it detects the main "Force Stop" button is still enabled and clicks it again. This plan introduces state management to ensure each step is performed only once per application.
+This plan details how to update the UI to reflect the "frozen" (Force Stopped) status of applications. When an application is already stopped or newly stopped by the automation, its checkbox will be disabled to prevent redundant actions.
 
 ## Proposed Changes
 
-### Accessibility Service State Management
+### Data Model
+
+#### [MODIFY] [RunningPackage.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/RunningPackageHelper.kt)
+- Add `isFrozen: Boolean = false` to the `RunningPackage` data class.
+
+### Communication Bridge
+
+#### [NEW] [FreezeStatusObserver.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/FreezeStatusObserver.kt)
+- Create a singleton observer (e.g., using `MutableSharedFlow` or a simple callback list) to notify the UI when a package's status changes.
+
+### Accessibility Service
 
 #### [MODIFY] [FreezeAccessibilityService.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/FreezeAccessibilityService.kt)
-- **Track Current Package**: Keep track of the package currently being processed.
-- **State Machine**: Introduce states:
-    - `IDLE`: Not doing anything.
-    - `CLICKED_MAIN`: The main "Force Stop" button has been clicked, waiting for the dialog.
-    - `FINISHED_PACKAGE`: The package is done (stopped or skipped).
-- **Handle Interruption**:
-    - Detect clicks on the "Cancel" button (`android:id/button2`).
-    - If "Cancel" is clicked, stop the entire queue (`packageQueue.clear()`) to respect the user's wish to stop the automation.
-- **One-Click Guard**: Ensure the main "Force Stop" button is only clicked once per package by checking the `currentPackage` and state.
-- **Improved Logging**: Log state transitions to help diagnose future issues.
+- Call `FreezeStatusObserver.notifyPackageFrozen(packageName)` whenever a package is confirmed stopped (either already disabled button or after clicking OK).
+
+### UI Components
+
+#### [MODIFY] [RunningPackagesAdapter.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/ui/running/RunningPackagesAdapter.kt)
+- In `onBindViewHolder`, disable the `packageCheckBox` if `runningPackage.isFrozen` is true.
+- Add a visual cue (e.g., alpha reduction or a "Frozen" text) for frozen items.
+
+#### [MODIFY] [RunningPackagesFragment.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/ui/running/RunningPackagesFragment.kt)
+- Observe `FreezeStatusObserver` updates.
+- Update the local `runningPackages` list and notify the adapter when a status change is received.
 
 ## Verification Plan
 
 ### Manual Verification
-- Deploy to Pixel 6a.
-- Select multiple apps.
-- Start freezing.
-- **Test Cancellation**: When the confirmation dialog appears, click "Cancel". The automation should stop immediately and return to the app.
-- **Test Success**: Allow the automation to complete. It should move through the apps without re-clicking the main button repeatedly.
-- **Test Already Stopped**: Ensure apps that are already stopped are still skipped correctly.
+- Select multiple apps, including some that are already stopped.
+- Click "Freeze Selected".
+- Observe that as each app is processed, its checkbox becomes disabled in the list once the service returns to the main app.
+- Verify that apps already stopped are immediately marked as disabled upon detection.

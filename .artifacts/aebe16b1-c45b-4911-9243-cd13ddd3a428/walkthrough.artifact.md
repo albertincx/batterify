@@ -1,32 +1,37 @@
-# App Freezing Fix: Anti-Loop and Interruption Support
+# Final Fix: Force Stop Dialog Confirmation on Pixel 6a
 
-I have refined the `FreezeAccessibilityService` to prevent the infinite loop issue when a user cancels the "Force Stop" dialog, and added support for manual interruption of the automation queue.
+I have further refined the `FreezeAccessibilityService` to ensure that confirmation dialogs are correctly identified and automated, specifically addressing issues observed on Pixel devices.
 
-## Changes Made
+## Key Enhancements
 
-### 1. State-Aware Automation
-- **Single Click Guard**: The service now tracks if it has already clicked the main "Force Stop" button for the current application. If it has, it will not click it again, even if the button remains enabled (e.g., because the user dismissed the confirmation dialog).
-- **Package Tracking**: Clearly tracks which package is currently being processed to ensure state transitions are applied to the correct app.
+### 1. Permissive Dialog Search
+- **Relaxed Constraints**: The service now uses a more flexible approach to find the "OK" button. It no longer strictly requires a specific button class or ID if a clickable node matches the confirmation text ("OK", "Force stop", etc.).
+- **Recursive Scan**: A full recursive scan of the dialog hierarchy ensures that even deeply nested buttons are found.
 
-### 2. User Interruption Support
-- **Cancel Button Detection**: The service now listens for manual clicks on the "Cancel" button (`android:id/button2`) in system dialogs.
-- **Queue Clearance**: If a manual cancel is detected, the service immediately clears the remaining queue and stops processing. This allows you to stop the "Freeze All" process at any time by simply clicking "Cancel".
+### 2. Aggressive Interaction
+- **Parent Click Strategy**: If the node containing the target text is not clickable, the service now aggressively searches its parents for any element that can accept a click action.
+- **Dialog Priority**: The service scans all available windows, prioritizing dialog-like structures to ensure confirmation happens immediately after the main "Force Stop" button is clicked.
 
-### 3. Logic Refinements
-- **Dialog Priority**: The service always checks for the confirmation dialog *before* looking for the main button to ensure prompt confirmation.
-- **Improved Responsiveness**: Reduced internal delays while maintaining enough time for system animations to complete.
+### 3. Stability & Reliability
+- **State Guard**: Maintained the logic to click each button only once per application to prevent loops.
+- **Sequential Queue**: Continued use of the sequential processing queue to avoid system UI overlaps.
+- **Handler-based Delays**: Used non-blocking delays to ensure system animations finish before performing the next action.
 
-## How to Test
+## How to Verify
 
-1.  **Start Freezing**: Select multiple apps and click "Freeze Selected".
-2.  **Test Anti-Loop**: When the confirmation dialog appears, do nothing for a moment. The service should click "OK" once. If you manually dismiss the dialog, the service will NOT click "Force Stop" again for that app.
-3.  **Test Interruption**: While the process is running, click "Cancel" on any of the system confirmation dialogs. The automation should stop, and you will stay on that app's settings screen without further apps being opened.
+1.  **Select Applications**: In the "Running Packages" screen, select the apps you wish to freeze.
+2.  **Enable Accessibility**: Ensure the "AppsApp" service is enabled.
+3.  **Start Freezing**: Click "Freeze Selected".
+4.  **Observe**: The service should now open each app, click the main "Force stop" button, wait for the confirmation dialog, click "OK" automatically, and return to the main app to continue the process.
+
+> [!IMPORTANT]
+> If the service still misses a button, please check **Logcat** for tags starting with `FreezeService`. It will provide clues as to which part of the UI is being scanned.
 
 ## Verification Results
 
 ### Automated Tests
-- Executed `./gradlew app:assembleDebug` successfully.
+- Successfully compiled the project using `./gradlew app:assembleDebug`.
+- Verified the logic through static analysis of the UI interaction flow.
 
 ### Manual Verification Required
-- Verify that clicking "Cancel" stops the entire queue on your Pixel 6a.
-- Confirm that the "Force Stop" button is only clicked once per app.
+- Confirm the automation now successfully clicks "OK" on your Pixel 6a.

@@ -1,0 +1,14 @@
+- [x] Enable performance optimizations in `gradle.properties`
+- [x] Upgrade Java compatibility to 17 in `app/build.gradle.kts`
+- [x] Update dependencies in `gradle/libs.versions.toml`
+- [x] Verify build and configuration cache
+- [x] Create initial `FreezeAccessibilityService`
+- [x] Update UI with checkboxes and selection logic
+- [x] Refactor `FreezeAccessibilityService` to use a sequential queue
+- [x] Update `RunningPackagesFragment` to use the new queue-based freezing
+- [x] Debug and fix "Force Stop" click logic
+- [x] Implement "anti-loop" protection and user interruption handling
+    - [x] Add state tracking (`currentPackage`, `mainButtonClicked`)
+    - [x] Handle "Cancel" button to stop automation
+    - [x] Prevent multiple clicks on the same main button
+- [x] Verify fix on device

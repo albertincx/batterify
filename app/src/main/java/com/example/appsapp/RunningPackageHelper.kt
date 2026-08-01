@@ -51,7 +51,8 @@ class RunningPackageHelper {
                                     processName = usageStat.packageName,
                                     processId = -1, // UsageStats doesn't provide PID
                                     appName = getApplicationLabel(context, usageStat.packageName),
-                                    isVisible = true
+                                    isVisible = true,
+                                    isFrozen = isPackageStopped(context, usageStat.packageName)
                                 )
                             )
                         }
@@ -65,7 +66,8 @@ class RunningPackageHelper {
                         processName = context.packageName,
                         processId = android.os.Process.myPid(),
                         appName = getApplicationLabel(context, context.packageName),
-                        isVisible = true
+                        isVisible = true,
+                        isFrozen = false // Current app is obviously running
                     )
                 )
             }
@@ -88,7 +90,8 @@ class RunningPackageHelper {
                                 processName = packageName,
                                 processId = processInfo.pid,
                                 appName = getApplicationLabel(context, packageName),
-                                isVisible = true
+                                isVisible = true,
+                                isFrozen = isPackageStopped(context, packageName)
                             )
                         )
                     }
@@ -96,6 +99,15 @@ class RunningPackageHelper {
             }
             
             return runningPackages.distinctBy { it.packageName } // Remove duplicates
+        }
+        
+        private fun isPackageStopped(context: Context, packageName: String): Boolean {
+            return try {
+                val ai = context.packageManager.getApplicationInfo(packageName, 0)
+                (ai.flags and android.content.pm.ApplicationInfo.FLAG_STOPPED) != 0
+            } catch (e: Exception) {
+                false
+            }
         }
         
         private fun hasUsageStatsPermission(context: Context): Boolean {

@@ -43,7 +43,7 @@ class RunningPackagesFragment : Fragment() {
     private fun loadRunningPackages() {
         // Convert the received list to a mutable list
         val runningPackages = RunningPackageHelper.getRunningPackages(requireContext()).toMutableList()
-        adapter = RunningPackagesAdapter(runningPackages) { runningPackage ->
+        adapter = RunningPackagesAdapter(requireContext(), runningPackages) { runningPackage ->
             // On modern Android, we can't kill other packages, so open app info instead
             openAppInfo(runningPackage.packageName)
         }

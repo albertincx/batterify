@@ -15,9 +15,14 @@ import androidx.core.content.ContextCompat
 class PackageKiller {
     companion object {
         fun killPackage(context: Context, packageName: String): Boolean {
+            // Check if package is installed
+            if (!isPackageInstalled(context, packageName)) {
+                return false
+            }
+
             // First check if we have the usage stats permission
             if (!hasUsageStatsPermission(context)) {
-                Toast.makeText(context, "Usage stats permission required. Please grant permission.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Требуется разрешение на доступ к статистике использования.", Toast.LENGTH_LONG).show()
                 
                 // Redirect to usage stats permission page
                 val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
@@ -27,41 +32,37 @@ class PackageKiller {
             }
 
             try {
+                // If device is rooted, we can use am force-stop which is the most effective way
+                // to achieve what the user wants (stop everything including background)
+                try {
+                    Runtime.getRuntime().exec(arrayOf("su", "-c", "am force-stop $packageName"))
+                } catch (e: Exception) {
+                    // Not rooted or su failed, continue with standard methods
+                }
+
                 val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
 
-                // On newer Android versions, killing arbitrary background processes is restricted
                 // Try to kill background processes
                 activityManager.killBackgroundProcesses(packageName)
 
-                Toast.makeText(context, "Attempted to kill background processes for $packageName", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Попытка остановки $packageName", Toast.LENGTH_SHORT).show()
                 return true
             } catch (e: SecurityException) {
-                Toast.makeText(context, "Permission denied to kill processes: ${e.message}", Toast.LENGTH_LONG).show()
+                // If we can't kill it, offer to open app info
+                openAppInfo(context, packageName)
                 return false
             } catch (e: Exception) {
-                Toast.makeText(context, "Failed to kill package: ${e.message}", Toast.LENGTH_LONG).show()
                 return false
             }
-            // On modern Android (6.0+), the KILL_BACKGROUND_PROCESSES permission is only available to system apps
-            // For regular apps, this will throw a SecurityException
-            // So we'll just provide feedback to the user about what's happening
-//            if (packageName == context.packageName) {
-//                // If trying to kill the current app, we can use finishAndRemoveTask or similar
-//                Toast.makeText(context, "Cannot kill current app from within itself", Toast.LENGTH_LONG).show()
-//                return false
-//            } else {
-//                // For other packages, inform the user about the restriction
-//                Toast.makeText(
-//                    context,
-//                    "Modern Android doesn't allow apps to kill other apps' processes for security reasons. " +
-//                    "Package '$packageName' may still be running.",
-//                    Toast.LENGTH_LONG
-//                ).show()
-//
-//                // Provide option to open app info instead
-//                openAppInfo(context, packageName)
-//                return false
-//            }
+        }
+
+        fun isPackageInstalled(context: Context, packageName: String): Boolean {
+            return try {
+                context.packageManager.getPackageInfo(packageName, 0)
+                true
+            } catch (e: PackageManager.NameNotFoundException) {
+                false
+            }
         }
         
         private fun hasUsageStatsPermission(context: Context): Boolean {
@@ -117,7 +118,7 @@ class PackageKiller {
                 false
             }
         }
-        private fun openAppInfo(context: Context, packageName: String) {
+        fun openAppInfo(context: Context, packageName: String) {
             try {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = android.net.Uri.parse("package:$packageName")

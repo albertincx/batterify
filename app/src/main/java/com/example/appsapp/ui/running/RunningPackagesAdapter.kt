@@ -10,7 +10,10 @@ import com.example.appsapp.PackageKiller
 import com.example.appsapp.R
 import com.example.appsapp.RunningPackage
 
+import android.content.Context
+
 class RunningPackagesAdapter(
+    private val context: Context,
     private val runningPackages: MutableList<RunningPackage>,
     private val onKillClick: (RunningPackage) -> Unit
 ) : RecyclerView.Adapter<RunningPackagesAdapter.RunningPackageViewHolder>() {
@@ -21,6 +24,7 @@ class RunningPackagesAdapter(
         val processIdTextView: TextView = itemView.findViewById(R.id.processIdTextView)
         val actionButton: Button = itemView.findViewById(R.id.actionButton)
         val hideButton: Button = itemView.findViewById(R.id.hideButton)
+        val killButton: Button = itemView.findViewById(R.id.killButton)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RunningPackageViewHolder {
@@ -48,6 +52,11 @@ class RunningPackagesAdapter(
                 runningPackage.isVisible = false
                 // Hide the item view
                 holder.itemView.visibility = View.GONE
+            }
+            
+            holder.killButton.setOnClickListener {
+                // Try to kill the package using PackageKiller
+                PackageKiller.killPackage(context, runningPackage.packageName)
             }
         } else {
             // If the item is not visible, hide the entire item view

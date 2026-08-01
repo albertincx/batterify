@@ -45,6 +45,33 @@ class HomeFragment : Fragment() {
             }
             PackageKiller.killPackage(requireContext(), packageName)
         }
+
+        binding.pauseSocialAppsButton.setOnClickListener {
+            val socialPackages = listOf(
+                "com.instagram.android",
+                "com.zhiliaoapp.musically",
+                "com.ss.android.ugc.trill",
+                "com.ss.android.ugc.aweme"
+            )
+            
+            var anyFound = false
+            socialPackages.forEach { pkg ->
+                if (PackageKiller.isPackageInstalled(requireContext(), pkg)) {
+                    anyFound = true
+                    PackageKiller.killPackage(requireContext(), pkg)
+                }
+            }
+            
+            if (anyFound) {
+                android.widget.Toast.makeText(
+                    requireContext(), 
+                    "Фоновые процессы соцсетей остановлены. Для полной остановки используйте 'Остановить' в настройках.", 
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } else {
+                android.widget.Toast.makeText(requireContext(), "Instagram или TikTok не найдены", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
         
         return root
     }

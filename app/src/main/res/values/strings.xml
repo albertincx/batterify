@@ -11,4 +11,5 @@
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
     <string name="menu_running_packages">Running Packages</string>
+    <string name="accessibility_service_description">Автоматизация остановки приложений (Force Stop) для экономии энергии.</string>
 </resources>

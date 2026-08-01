@@ -24,8 +24,9 @@ class FreezeAccessibilityService : AccessibilityService() {
         private val mainHandler = Handler(Looper.getMainLooper())
 
         fun startFreezing(context: Context, packageNames: List<String>) {
+            val filtered = packageNames.filter { it != context.packageName }
             packageQueue.clear()
-            packageQueue.addAll(packageNames)
+            packageQueue.addAll(filtered)
             isProcessing = true
             mainButtonClicked = false
             processNext(context)
@@ -36,6 +37,10 @@ class FreezeAccessibilityService : AccessibilityService() {
             mainButtonClicked = false
             
             if (currentPackage != null) {
+                if (currentPackage == context.packageName) {
+                    processNext(context)
+                    return
+                }
                 Log.d(TAG, "Starting to freeze: $currentPackage")
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.parse("package:$currentPackage")
@@ -45,9 +50,16 @@ class FreezeAccessibilityService : AccessibilityService() {
             } else {
                 isProcessing = false
                 Log.d(TAG, "Queue empty, finished.")
+                returnToMainApp(context)
             }
         }
         
+        private fun returnToMainApp(context: Context) {
+            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            intent?.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            intent?.let { context.startActivity(it) }
+        }
+
         fun stopAutomation() {
             Log.d(TAG, "Automation stopped by user or interruption.")
             packageQueue.clear()
@@ -251,7 +263,7 @@ class FreezeAccessibilityService : AccessibilityService() {
 
     private fun goBackAndContinue() {
         mainHandler.postDelayed({
-            performGlobalAction(GLOBAL_ACTION_BACK)
+            returnToMainApp(this)
             mainHandler.postDelayed({
                 processNext(this)
             }, 700)

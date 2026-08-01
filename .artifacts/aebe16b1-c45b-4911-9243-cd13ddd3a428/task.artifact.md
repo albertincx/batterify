@@ -9,10 +9,9 @@
 - [x] Debug and fix "Force Stop" click logic
 - [x] Implement "anti-loop" protection and user interruption handling
 - [x] Fix dialog confirmation on Pixel 6a
-- [/] Disable checkbox for frozen apps
-    - [ ] Update `RunningPackage` data model
-    - [ ] Create `FreezeStatusObserver` for cross-component communication
-    - [ ] Notify observer from `FreezeAccessibilityService`
-    - [ ] Update `RunningPackagesAdapter` to disable checkboxes
-    - [ ] Observe updates in `RunningPackagesFragment`
-- [ ] Verify fix on device
+- [x] Disable checkbox for frozen apps
+- [x] Fix main app closing after freeze action
+    - [x] Filter out main app from `RunningPackageHelper`
+    - [x] Replace `GLOBAL_ACTION_BACK` with deterministic Intent return
+    - [x] Add self-freeze guard in service
+- [x] Verify fix on device

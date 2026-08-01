@@ -1,38 +1,26 @@
-# Disabling Checkbox for Frozen Applications
+# Fixing Main App Closing After Freeze Action
 
-This plan details how to update the UI to reflect the "frozen" (Force Stopped) status of applications. When an application is already stopped or newly stopped by the automation, its checkbox will be disabled to prevent redundant actions.
+The main app (AppsApp) sometimes closes during the automation process because `GLOBAL_ACTION_BACK` is unreliable and can target the wrong window. This plan replaces the "Back" action with a deterministic "Bring to Front" intent and ensures the app never attempts to freeze itself.
 
 ## Proposed Changes
 
-### Data Model
+### Logic & Safety
 
-#### [MODIFY] [RunningPackage.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/RunningPackageHelper.kt)
-- Add `isFrozen: Boolean = false` to the `RunningPackage` data class.
+#### [MODIFY] [RunningPackageHelper.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/RunningPackageHelper.kt)
+- Explicitly filter out `context.packageName` from the list of running packages to prevent the user from accidentally freezing the main app.
 
-### Communication Bridge
-
-#### [NEW] [FreezeStatusObserver.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/FreezeStatusObserver.kt)
-- Create a singleton observer (e.g., using `MutableSharedFlow` or a simple callback list) to notify the UI when a package's status changes.
-
-### Accessibility Service
+### Accessibility Service Refinement
 
 #### [MODIFY] [FreezeAccessibilityService.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/FreezeAccessibilityService.kt)
-- Call `FreezeStatusObserver.notifyPackageFrozen(packageName)` whenever a package is confirmed stopped (either already disabled button or after clicking OK).
-
-### UI Components
-
-#### [MODIFY] [RunningPackagesAdapter.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/ui/running/RunningPackagesAdapter.kt)
-- In `onBindViewHolder`, disable the `packageCheckBox` if `runningPackage.isFrozen` is true.
-- Add a visual cue (e.g., alpha reduction or a "Frozen" text) for frozen items.
-
-#### [MODIFY] [RunningPackagesFragment.kt](file:///Users/albert/AndroidStudioProjects/AppsApp/app/src/main/java/com/example/appsapp/ui/running/RunningPackagesFragment.kt)
-- Observe `FreezeStatusObserver` updates.
-- Update the local `runningPackages` list and notify the adapter when a status change is received.
+- **Replace Back Action**: Change `performGlobalAction(GLOBAL_ACTION_BACK)` to an Intent-based return. Launch `MainActivity` with `FLAG_ACTIVITY_REORDER_TO_FRONT`.
+- **Centralize Handler**: Ensure only one transition handler is active at a time to prevent overlapping actions (race conditions).
+- **Self-Freeze Guard**: Add a final check in `startFreezing` and `processNext` to never process the app's own package.
 
 ## Verification Plan
 
 ### Manual Verification
-- Select multiple apps, including some that are already stopped.
+- Deploy to device.
+- Select multiple apps (the main app should no longer be in the list).
 - Click "Freeze Selected".
-- Observe that as each app is processed, its checkbox becomes disabled in the list once the service returns to the main app.
-- Verify that apps already stopped are immediately marked as disabled upon detection.
+- Verify that after each app is frozen, the UI returns to AppsApp without closing it.
+- Verify that the process completes and the user stays within AppsApp.

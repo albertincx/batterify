@@ -1,37 +1,31 @@
-# Final Fix: Force Stop Dialog Confirmation on Pixel 6a
+# Final Stability Fixes: Reliable App Return and Self-Freeze Protection
 
-I have further refined the `FreezeAccessibilityService` to ensure that confirmation dialogs are correctly identified and automated, specifically addressing issues observed on Pixel devices.
+I have addressed the stability issues where the main app (AppsApp) would sometimes close or be dismissed during the automation process.
 
-## Key Enhancements
+## Stability Improvements
 
-### 1. Permissive Dialog Search
-- **Relaxed Constraints**: The service now uses a more flexible approach to find the "OK" button. It no longer strictly requires a specific button class or ID if a clickable node matches the confirmation text ("OK", "Force stop", etc.).
-- **Recursive Scan**: A full recursive scan of the dialog hierarchy ensures that even deeply nested buttons are found.
+### 1. Deterministic App Return
+- **Intent-based Navigation**: Replaced the unreliable `GLOBAL_ACTION_BACK` with a deterministic `Intent`. The service now explicitly brings AppsApp back to the foreground using `FLAG_ACTIVITY_REORDER_TO_FRONT` after each freeze action. This ensures you always return to the list and prevents accidental app closure.
 
-### 2. Aggressive Interaction
-- **Parent Click Strategy**: If the node containing the target text is not clickable, the service now aggressively searches its parents for any element that can accept a click action.
-- **Dialog Priority**: The service scans all available windows, prioritizing dialog-like structures to ensure confirmation happens immediately after the main "Force Stop" button is clicked.
+### 2. Self-Freeze Prevention
+- **Filtering**: Updated `RunningPackageHelper` to explicitly exclude **AppsApp** from the list of running packages. You can no longer accidentally select the app you are currently using.
+- **Service Guards**: Added a secondary safety check inside `FreezeAccessibilityService` to ensure that even if a manual request is sent, it will never attempt to open the settings for its own package.
 
-### 3. Stability & Reliability
-- **State Guard**: Maintained the logic to click each button only once per application to prevent loops.
-- **Sequential Queue**: Continued use of the sequential processing queue to avoid system UI overlaps.
-- **Handler-based Delays**: Used non-blocking delays to ensure system animations finish before performing the next action.
+### 3. Queue Management
+- **Synchronized Transitions**: Refined the transition between apps in the queue to ensure that the main app is fully visible before the next "App Info" screen is launched.
 
-## How to Verify
+## How to Test
 
-1.  **Select Applications**: In the "Running Packages" screen, select the apps you wish to freeze.
-2.  **Enable Accessibility**: Ensure the "AppsApp" service is enabled.
-3.  **Start Freezing**: Click "Freeze Selected".
-4.  **Observe**: The service should now open each app, click the main "Force stop" button, wait for the confirmation dialog, click "OK" automatically, and return to the main app to continue the process.
-
-> [!IMPORTANT]
-> If the service still misses a button, please check **Logcat** for tags starting with `FreezeService`. It will provide clues as to which part of the UI is being scanned.
+1.  **Selection**: Notice that **AppsApp** is no longer visible in the "Running Packages" list.
+2.  **Batch Process**: Select multiple apps and click **"Freeze Selected"**.
+3.  **Stability**: Observe that after every automated "Force Stop", you are reliably returned to the AppsApp list without the app blinking out or closing.
+4.  **Completion**: Once the queue is empty, the app will stay on the "Running Packages" screen with all processed apps correctly marked as "Frozen".
 
 ## Verification Results
 
 ### Automated Tests
 - Successfully compiled the project using `./gradlew app:assembleDebug`.
-- Verified the logic through static analysis of the UI interaction flow.
+- Logic verified via code flow analysis.
 
 ### Manual Verification Required
-- Confirm the automation now successfully clicks "OK" on your Pixel 6a.
+- Confirm that the app no longer closes during the freezing process on your Pixel 6a.

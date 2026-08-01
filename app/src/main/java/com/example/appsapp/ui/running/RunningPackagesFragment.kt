@@ -14,12 +14,16 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.appsapp.FreezeAccessibilityService
+import com.example.appsapp.FreezeStatusObserver
 import com.example.appsapp.PackageKiller
 import com.example.appsapp.RunningPackageHelper
 import com.example.appsapp.R
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class RunningPackagesFragment : Fragment() {
 
@@ -66,8 +70,22 @@ class RunningPackagesFragment : Fragment() {
 
         loadRunningPackages()
         updateAccessibilityStatus()
+        observeFreezeStatus()
 
         return root
+    }
+
+    private fun observeFreezeStatus() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            FreezeStatusObserver.frozenPackages.collectLatest { packageName ->
+                if (::adapter.isInitialized) {
+                    val pos = adapter.updatePackageFrozen(packageName)
+                    if (pos != -1) {
+                        android.util.Log.d("RunningPackages", "Marked $packageName as frozen in UI")
+                    }
+                }
+            }
+        }
     }
 
     override fun onResume() {

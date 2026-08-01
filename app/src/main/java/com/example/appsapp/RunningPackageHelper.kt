@@ -13,7 +13,8 @@ data class RunningPackage(
     val processId: Int,
     val appName: String,
     var isVisible: Boolean = true,
-    var isSelected: Boolean = false
+    var isSelected: Boolean = false,
+    var isFrozen: Boolean = false
 )
 
 class RunningPackageHelper {

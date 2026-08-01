@@ -59,7 +59,6 @@ class FreezeAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!isProcessing) return
         
-        // Listen for user manual clicks on Cancel button
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val nodeId = event.source?.viewIdResourceName
             if (nodeId == "android:id/button2") {
@@ -69,32 +68,27 @@ class FreezeAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Listen for Window changes
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && 
             event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
 
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastActionTime < 300) return
+        if (currentTime - lastActionTime < 200) return
 
-        // Search in all interactive windows (dialogs are often separate windows)
         val allWindows = windows
         for (window in allWindows) {
             val root = window.root ?: continue
             
-            // Step 1: Handle the "OK" / confirmation dialog
             if (handleDialog(root)) {
                 lastActionTime = System.currentTimeMillis()
                 return
             }
 
-            // Step 2: Handle the main "Force Stop" button in App Info
             if (handleAppInfo(root)) {
                 lastActionTime = System.currentTimeMillis()
                 return
             }
         }
 
-        // Retry mechanism for cases where the window is just loading
         mainHandler.removeCallbacksAndMessages("retry_all")
         mainHandler.postDelayed({
             if (isProcessing) {
@@ -106,19 +100,21 @@ class FreezeAccessibilityService : AccessibilityService() {
                     }
                 }
             }
-        }, "retry_all", 500)
+        }, "retry_all", 400)
     }
 
     private fun handleDialog(root: AccessibilityNodeInfo): Boolean {
-        val dialogTexts = listOf("OK", "ОК", "Force stop", "Остановить", "Force stop?", "Остановить?")
+        // Pixel 6a specific: button is likely "OK" or "Force stop" (NO question mark)
+        val dialogTexts = listOf("OK", "ОК", "Force stop", "Остановить")
         
-        // 1. Search by system ID button1
-        val dialogButtons = root.findAccessibilityNodeInfosByViewId("android:id/button1")
-        if (!dialogButtons.isNullOrEmpty()) {
-            for (node in dialogButtons) {
+        // 1. Prioritize android:id/button1 (The "Positive" button in standard dialogs)
+        val buttons = root.findAccessibilityNodeInfosByViewId("android:id/button1")
+        if (!buttons.isNullOrEmpty()) {
+            for (node in buttons) {
                 if (node.isVisibleToUser && node.isEnabled) {
                     if (performAggressiveClick(node)) {
-                        Log.d(TAG, "Clicked Dialog button1 for $currentPackage")
+                        Log.d(TAG, "Confirmed dialog via button1 for $currentPackage")
+                        currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                         goBackAndContinue()
                         return true
                     }
@@ -126,15 +122,25 @@ class FreezeAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 2. Search by text (recursive)
-        val nodeByText = recursiveSearch(root, dialogTexts, true)
-        if (nodeByText != null && nodeByText.isVisibleToUser && nodeByText.isEnabled) {
-            if (performAggressiveClick(nodeByText)) {
-                Log.d(TAG, "Clicked Dialog button by text for $currentPackage")
+        // 2. Search for clickable nodes matching text
+        val clickableNode = recursiveSearchClickable(root, dialogTexts)
+        if (clickableNode != null) {
+            Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.text}")
+            if (performAggressiveClick(clickableNode)) {
+                Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
+                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                 goBackAndContinue()
                 return true
             }
         }
+        
+        // If we found "Force stop?" (the title) but no button yet, dump the window to help debug
+        val titleMatch = root.findAccessibilityNodeInfosByText("Force stop?")
+        if (!titleMatch.isNullOrEmpty()) {
+            Log.d(TAG, "Dialog title 'Force stop?' detected, but button not found yet. Dumping window...")
+            dumpNodes(root, 0)
+        }
+
         return false
     }
 
@@ -148,7 +154,6 @@ class FreezeAccessibilityService : AccessibilityService() {
         )
         val texts = listOf("Force stop", "Остановить")
         
-        // Try IDs
         for (id in ids) {
             val nodes = root.findAccessibilityNodeInfosByViewId(id)
             for (node in nodes) {
@@ -160,7 +165,8 @@ class FreezeAccessibilityService : AccessibilityService() {
                             return true
                         }
                     } else {
-                        Log.d(TAG, "Main button already disabled for $currentPackage, skipping")
+                        Log.d(TAG, "Main button disabled, skipping $currentPackage")
+                        currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                         goBackAndContinue()
                         return true
                     }
@@ -168,63 +174,79 @@ class FreezeAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Try Text (recursive)
-        val nodeByText = recursiveSearch(root, texts, false)
-        if (nodeByText != null && nodeByText.isVisibleToUser) {
-            if (nodeByText.isEnabled) {
-                if (performAggressiveClick(nodeByText)) {
-                    Log.d(TAG, "Clicked main Force Stop (Text) for $currentPackage")
-                    mainButtonClicked = true
+        val nodeByText = recursiveSearchClickable(root, texts)
+        if (nodeByText != null) {
+            // Ensure it's not the dialog button by checking ID
+            if (nodeByText.viewIdResourceName != "android:id/button1") {
+                if (nodeByText.isEnabled) {
+                    if (performAggressiveClick(nodeByText)) {
+                        Log.d(TAG, "Clicked main Force Stop (Text) for $currentPackage")
+                        mainButtonClicked = true
+                        return true
+                    }
+                } else {
+                    Log.d(TAG, "Main button (Text) disabled, skipping $currentPackage")
+                    currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+                    goBackAndContinue()
                     return true
                 }
-            } else {
-                Log.d(TAG, "Main button (Text) already disabled for $currentPackage, skipping")
-                goBackAndContinue()
-                return true
             }
         }
         return false
     }
 
     private fun performAggressiveClick(node: AccessibilityNodeInfo): Boolean {
-        // Try direct click
         if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
-        
-        // Try clicking parents
         var parent = node.parent
         while (parent != null) {
             if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
             parent = parent.parent
         }
-        
-        // Try clicking by coordinates if nothing else works (last resort)
-        // Note: performAction(ACTION_CLICK) on a non-clickable node sometimes works if it has clickable descendants or vice-versa
         return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
-    private fun recursiveSearch(node: AccessibilityNodeInfo, texts: List<String>, isDialogSearch: Boolean): AccessibilityNodeInfo? {
-        val nodeText = node.text?.toString()?.uppercase()
-        val contentDesc = node.contentDescription?.toString()?.uppercase()
+    private fun recursiveSearchClickable(node: AccessibilityNodeInfo, texts: List<String>): AccessibilityNodeInfo? {
+        val nodeText = node.text?.toString()?.uppercase() ?: ""
+        val contentDesc = node.contentDescription?.toString()?.uppercase() ?: ""
         
         for (text in texts) {
             val target = text.uppercase()
-            if ((nodeText != null && nodeText.contains(target)) || (contentDesc != null && contentDesc.contains(target))) {
-                if (isDialogSearch) {
-                    // Dialogs: prefer button1 or node with "button" in class
-                    if (node.viewIdResourceName == "android:id/button1" || node.className?.contains("Button") == true) return node
-                } else {
-                    // Main info: avoid dialog button1
-                    if (node.viewIdResourceName != "android:id/button1") return node
+            // Strict match for text to avoid matching titles like "Force stop?"
+            val matches = nodeText == target || nodeText.startsWith(target + " ") || contentDesc == target
+            
+            if (matches) {
+                // Check if this node or any parent is clickable
+                if (node.isClickable || isAnyParentClickable(node)) {
+                    return node
                 }
             }
         }
 
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            val result = recursiveSearch(child, texts, isDialogSearch)
+            val result = recursiveSearchClickable(child, texts)
             if (result != null) return result
         }
         return null
+    }
+
+    private fun isAnyParentClickable(node: AccessibilityNodeInfo): Boolean {
+        var p = node.parent
+        while (p != null) {
+            if (p.isClickable) return true
+            p = p.parent
+        }
+        return false
+    }
+
+    private fun dumpNodes(node: AccessibilityNodeInfo, depth: Int) {
+        if (depth > 20) return // Safety
+        val indent = "  ".repeat(depth)
+        Log.d(TAG, "${indent}Text: ${node.text} | ID: ${node.viewIdResourceName} | Clickable: ${node.isClickable} | Visible: ${node.isVisibleToUser}")
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            dumpNodes(child, depth + 1)
+        }
     }
 
     private fun goBackAndContinue() {
@@ -232,8 +254,8 @@ class FreezeAccessibilityService : AccessibilityService() {
             performGlobalAction(GLOBAL_ACTION_BACK)
             mainHandler.postDelayed({
                 processNext(this)
-            }, 800)
-        }, 500)
+            }, 700)
+        }, 300)
     }
 
     override fun onInterrupt() {}

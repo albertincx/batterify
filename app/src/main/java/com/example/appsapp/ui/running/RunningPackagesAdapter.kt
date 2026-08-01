@@ -39,16 +39,33 @@ class RunningPackagesAdapter(
         holder.appNameTextView.text = runningPackage.appName
         holder.packageNameTextView.text = runningPackage.packageName
         
+        // Handle frozen state
+        if (runningPackage.isFrozen) {
+            holder.packageCheckBox.isEnabled = false
+            holder.packageCheckBox.isChecked = false
+            holder.itemView.alpha = 0.5f
+            holder.appNameTextView.text = "${runningPackage.appName} (Frozen)"
+        } else {
+            holder.packageCheckBox.isEnabled = true
+            holder.itemView.alpha = 1.0f
+        }
+        
         // Remove listener first to avoid trigger when setting state
         holder.packageCheckBox.setOnCheckedChangeListener(null)
-        holder.packageCheckBox.isChecked = runningPackage.isSelected
+        if (!runningPackage.isFrozen) {
+            holder.packageCheckBox.isChecked = runningPackage.isSelected
+        }
         
         holder.packageCheckBox.setOnCheckedChangeListener { _, isChecked ->
-            runningPackage.isSelected = isChecked
+            if (!runningPackage.isFrozen) {
+                runningPackage.isSelected = isChecked
+            }
         }
 
         holder.itemView.setOnClickListener {
-            holder.packageCheckBox.isChecked = !holder.packageCheckBox.isChecked
+            if (!runningPackage.isFrozen) {
+                holder.packageCheckBox.isChecked = !holder.packageCheckBox.isChecked
+            }
         }
         
         holder.hideButton.setOnClickListener {
@@ -73,6 +90,16 @@ class RunningPackagesAdapter(
     }
 
     fun getSelectedPackages(): List<RunningPackage> {
-        return runningPackages.filter { it.isSelected }
+        return runningPackages.filter { it.isSelected && !it.isFrozen }
+    }
+
+    fun updatePackageFrozen(packageName: String): Int {
+        val index = runningPackages.indexOfFirst { it.packageName == packageName }
+        if (index != -1) {
+            runningPackages[index].isFrozen = true
+            runningPackages[index].isSelected = false
+            notifyItemChanged(index)
+        }
+        return index
     }
 }

@@ -1,14 +1,22 @@
 package com.example.appsapp.ui.running
 
+import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityManager
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.appsapp.FreezeAccessibilityService
 import com.example.appsapp.PackageKiller
 import com.example.appsapp.RunningPackageHelper
 import com.example.appsapp.R
@@ -17,6 +25,9 @@ class RunningPackagesFragment : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var refreshButton: Button
+    private lateinit var freezeButton: Button
+    private lateinit var accessibilityButton: Button
+    private lateinit var selectAllCheckBox: CheckBox
     private lateinit var adapter: RunningPackagesAdapter
 
     override fun onCreateView(
@@ -28,6 +39,9 @@ class RunningPackagesFragment : Fragment() {
 
         recyclerView = root.findViewById(R.id.runningPackagesRecyclerView)
         refreshButton = root.findViewById(R.id.refresh_button)
+        freezeButton = root.findViewById(R.id.freeze_button)
+        accessibilityButton = root.findViewById(R.id.accessibility_button)
+        selectAllCheckBox = root.findViewById(R.id.selectAllCheckBox)
 
         recyclerView.layoutManager = LinearLayoutManager(context)
 
@@ -35,26 +49,89 @@ class RunningPackagesFragment : Fragment() {
             loadRunningPackages()
         }
 
+        freezeButton.setOnClickListener {
+            freezeSelectedPackages()
+        }
+
+        accessibilityButton.setOnClickListener {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivity(intent)
+        }
+
+        selectAllCheckBox.setOnCheckedChangeListener { _, isChecked ->
+            if (::adapter.isInitialized) {
+                adapter.selectAll(isChecked)
+            }
+        }
+
         loadRunningPackages()
+        updateAccessibilityStatus()
 
         return root
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateAccessibilityStatus()
+    }
+
+    private fun updateAccessibilityStatus() {
+        val enabled = isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)
+        if (enabled) {
+            accessibilityButton.text = "Accessibility On"
+            accessibilityButton.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
+        } else {
+            accessibilityButton.text = "Accessibility Off"
+            accessibilityButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
+        }
+    }
+
+    private fun isAccessibilityServiceEnabled(context: Context, service: Class<out AccessibilityService>): Boolean {
+        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
+        for (enabledService in enabledServices) {
+            val enabledServiceInfo = enabledService.resolveInfo.serviceInfo
+            if (enabledServiceInfo.packageName == context.packageName && enabledServiceInfo.name == service.name) {
+                return true
+            }
+        }
+        return false
+    }
+
     private fun loadRunningPackages() {
-        // Convert the received list to a mutable list
         val runningPackages = RunningPackageHelper.getRunningPackages(requireContext()).toMutableList()
         adapter = RunningPackagesAdapter(requireContext(), runningPackages) { runningPackage ->
-            // On modern Android, we can't kill other packages, so open app info instead
             openAppInfo(runningPackage.packageName)
         }
         recyclerView.adapter = adapter
     }
 
+    private fun freezeSelectedPackages() {
+        if (!isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)) {
+            Toast.makeText(context, "Please enable Accessibility Service first", Toast.LENGTH_LONG).show()
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivity(intent)
+            return
+        }
+
+        val selected = adapter.getSelectedPackages()
+        if (selected.isEmpty()) {
+            Toast.makeText(context, "No apps selected", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Use the new sequential freezing logic
+        val packageNames = selected.map { it.packageName }
+        FreezeAccessibilityService.startFreezing(requireContext(), packageNames)
+        
+        Toast.makeText(context, "Freezing ${selected.size} apps...", Toast.LENGTH_SHORT).show()
+    }
+
     private fun openAppInfo(packageName: String) {
         try {
-            val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = android.net.Uri.parse("package:$packageName")
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             requireContext().startActivity(intent)
         } catch (e: Exception) {

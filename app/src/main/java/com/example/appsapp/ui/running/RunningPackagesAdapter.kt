@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.appsapp.PackageKiller
@@ -21,10 +22,9 @@ class RunningPackagesAdapter(
     class RunningPackageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val appNameTextView: TextView = itemView.findViewById(R.id.appNameTextView)
         val packageNameTextView: TextView = itemView.findViewById(R.id.packageNameTextView)
-        val processIdTextView: TextView = itemView.findViewById(R.id.processIdTextView)
-        val actionButton: Button = itemView.findViewById(R.id.actionButton)
+        val packageCheckBox: CheckBox = itemView.findViewById(R.id.packageCheckBox)
         val hideButton: Button = itemView.findViewById(R.id.hideButton)
-        val killButton: Button = itemView.findViewById(R.id.killButton)
+        val actionButton: Button = itemView.findViewById(R.id.actionButton)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RunningPackageViewHolder {
@@ -36,46 +36,43 @@ class RunningPackagesAdapter(
     override fun onBindViewHolder(holder: RunningPackageViewHolder, position: Int) {
         val runningPackage = runningPackages[position]
         
-        // Only bind visible items
-        if (runningPackage.isVisible) {
-            holder.itemView.visibility = View.VISIBLE
-            holder.appNameTextView.text = runningPackage.appName
-            holder.packageNameTextView.text = runningPackage.packageName
-            holder.processIdTextView.text = "PID: ${runningPackage.processId}"
-            
-            holder.actionButton.setOnClickListener {
-                onKillClick(runningPackage)
+        holder.appNameTextView.text = runningPackage.appName
+        holder.packageNameTextView.text = runningPackage.packageName
+        
+        // Remove listener first to avoid trigger when setting state
+        holder.packageCheckBox.setOnCheckedChangeListener(null)
+        holder.packageCheckBox.isChecked = runningPackage.isSelected
+        
+        holder.packageCheckBox.setOnCheckedChangeListener { _, isChecked ->
+            runningPackage.isSelected = isChecked
+        }
+
+        holder.itemView.setOnClickListener {
+            holder.packageCheckBox.isChecked = !holder.packageCheckBox.isChecked
+        }
+        
+        holder.hideButton.setOnClickListener {
+            runningPackage.isVisible = false
+            val pos = holder.adapterPosition
+            if (pos != RecyclerView.NO_POSITION) {
+                runningPackages.removeAt(pos)
+                notifyItemRemoved(pos)
             }
-            
-            holder.hideButton.setOnClickListener {
-                // Hide the item by setting isVisible to false
-                runningPackage.isVisible = false
-                // Hide the item view
-                holder.itemView.visibility = View.GONE
-            }
-            
-            holder.killButton.setOnClickListener {
-                // Try to kill the package using PackageKiller
-                PackageKiller.killPackage(context, runningPackage.packageName)
-            }
-        } else {
-            // If the item is not visible, hide the entire item view
-            holder.itemView.visibility = View.GONE
+        }
+        
+        holder.actionButton.setOnClickListener {
+            onKillClick(runningPackage)
         }
     }
 
     override fun getItemCount(): Int = runningPackages.size
     
-    // Function to return only visible packages
-    fun getVisiblePackages(): List<RunningPackage> {
-        return runningPackages.filter { it.isVisible }
-    }
-    
-    // Function to reset visibility of all items
-    fun resetVisibility() {
-        for (pkg in runningPackages) {
-            pkg.isVisible = true
-        }
+    fun selectAll(select: Boolean) {
+        runningPackages.forEach { it.isSelected = select }
         notifyDataSetChanged()
+    }
+
+    fun getSelectedPackages(): List<RunningPackage> {
+        return runningPackages.filter { it.isSelected }
     }
 }

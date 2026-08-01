@@ -12,7 +12,8 @@ data class RunningPackage(
     val processName: String,
     val processId: Int,
     val appName: String,
-    var isVisible: Boolean = true
+    var isVisible: Boolean = true,
+    var isSelected: Boolean = false
 )
 
 class RunningPackageHelper {

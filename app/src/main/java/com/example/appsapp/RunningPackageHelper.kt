@@ -105,7 +105,7 @@ class RunningPackageHelper {
             return runningPackages.distinctBy { it.packageName } // Remove duplicates
         }
         
-        private fun isPackageStopped(context: Context, packageName: String): Boolean {
+        fun isPackageStopped(context: Context, packageName: String): Boolean {
             return try {
                 val ai = context.packageManager.getApplicationInfo(packageName, 0)
                 (ai.flags and android.content.pm.ApplicationInfo.FLAG_STOPPED) != 0

@@ -20,6 +20,8 @@ class FreezeAccessibilityService : AccessibilityService() {
         private var isProcessing = false
         private var currentPackage: String? = null
         private var mainButtonClicked = false
+        private var dialogHandled = false
+        private var isWaitingForNext = false
         private var lastActionTime = 0L
         private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -33,8 +35,12 @@ class FreezeAccessibilityService : AccessibilityService() {
         }
 
         private fun processNext(context: Context) {
+            if (!isProcessing && currentPackage == null && packageQueue.isEmpty()) return
+            
             currentPackage = packageQueue.poll()
             mainButtonClicked = false
+            dialogHandled = false
+            isWaitingForNext = false
             
             if (currentPackage != null) {
                 if (currentPackage == context.packageName) {
@@ -69,7 +75,10 @@ class FreezeAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (!isProcessing) return
+        if (!isProcessing || isWaitingForNext) {
+            mainHandler.removeCallbacksAndMessages("retry_all")
+            return
+        }
         
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val nodeId = event.source?.viewIdResourceName
@@ -84,7 +93,7 @@ class FreezeAccessibilityService : AccessibilityService() {
             event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
 
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastActionTime < 200) return
+        if (currentTime - lastActionTime < 400) return
 
         val allWindows = windows
         for (window in allWindows) {
@@ -92,18 +101,20 @@ class FreezeAccessibilityService : AccessibilityService() {
             
             if (handleDialog(root)) {
                 lastActionTime = System.currentTimeMillis()
+                mainHandler.removeCallbacksAndMessages("retry_all")
                 return
             }
 
             if (handleAppInfo(root)) {
                 lastActionTime = System.currentTimeMillis()
+                mainHandler.removeCallbacksAndMessages("retry_all")
                 return
             }
         }
 
         mainHandler.removeCallbacksAndMessages("retry_all")
         mainHandler.postDelayed({
-            if (isProcessing) {
+            if (isProcessing && !isWaitingForNext) {
                 for (w in windows) {
                     val r = w.root ?: continue
                     if (handleDialog(r) || handleAppInfo(r)) {
@@ -112,12 +123,13 @@ class FreezeAccessibilityService : AccessibilityService() {
                     }
                 }
             }
-        }, "retry_all", 400)
+        }, "retry_all", 500)
     }
 
     private fun handleDialog(root: AccessibilityNodeInfo): Boolean {
-        // Pixel 6a specific: button is likely "OK" or "Force stop" (NO question mark)
-        val dialogTexts = listOf("OK", "ОК", "Force stop", "Остановить")
+        if (dialogHandled) return false
+        // Expanded variations for different devices/languages
+        val dialogTexts = listOf("OK", "ОК", "Force stop", "Остановить", "ПРИНУДИТЕЛЬНО ОСТАНОВИТЬ")
         
         // 1. Prioritize android:id/button1 (The "Positive" button in standard dialogs)
         val buttons = root.findAccessibilityNodeInfosByViewId("android:id/button1")
@@ -126,7 +138,7 @@ class FreezeAccessibilityService : AccessibilityService() {
                 if (node.isVisibleToUser && node.isEnabled) {
                     if (performAggressiveClick(node)) {
                         Log.d(TAG, "Confirmed dialog via button1 for $currentPackage")
-                        currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+                        dialogHandled = true
                         goBackAndContinue()
                         return true
                     }
@@ -140,7 +152,7 @@ class FreezeAccessibilityService : AccessibilityService() {
             Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.text}")
             if (performAggressiveClick(clickableNode)) {
                 Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
-                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+                dialogHandled = true
                 goBackAndContinue()
                 return true
             }
@@ -162,9 +174,10 @@ class FreezeAccessibilityService : AccessibilityService() {
         val ids = listOf(
             "com.android.settings:id/force_stop_button",
             "com.android.settings:id/right_button",
-            "com.android.settings:id/action_button"
+            "com.android.settings:id/action_button",
+            "com.miui.securitycenter:id/force_stop"
         )
-        val texts = listOf("Force stop", "Остановить")
+        val texts = listOf("Force stop", "Остановить", "ОСТАНОВИТЬ", "ПРИНУДИТЕЛЬНО ОСТАНОВИТЬ")
         
         for (id in ids) {
             val nodes = root.findAccessibilityNodeInfosByViewId(id)
@@ -177,9 +190,9 @@ class FreezeAccessibilityService : AccessibilityService() {
                             return true
                         }
                     } else {
-                        Log.d(TAG, "Main button disabled, skipping $currentPackage")
-                        currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                        goBackAndContinue()
+                        // If it's disabled, it's already stopped
+                        Log.d(TAG, "Force Stop button (ID: $id) is disabled for $currentPackage")
+                        verifyAndContinue()
                         return true
                     }
                 }
@@ -188,23 +201,25 @@ class FreezeAccessibilityService : AccessibilityService() {
 
         val nodeByText = recursiveSearchClickable(root, texts)
         if (nodeByText != null) {
-            // Ensure it's not the dialog button by checking ID
-            if (nodeByText.viewIdResourceName != "android:id/button1") {
-                if (nodeByText.isEnabled) {
-                    if (performAggressiveClick(nodeByText)) {
-                        Log.d(TAG, "Clicked main Force Stop (Text) for $currentPackage")
-                        mainButtonClicked = true
-                        return true
-                    }
-                } else {
-                    Log.d(TAG, "Main button (Text) disabled, skipping $currentPackage")
-                    currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                    goBackAndContinue()
+            if (nodeByText.isEnabled) {
+                if (performAggressiveClick(nodeByText)) {
+                    Log.d(TAG, "Clicked main Force Stop (Text: ${nodeByText.text}) for $currentPackage")
+                    mainButtonClicked = true
                     return true
                 }
+            } else {
+                Log.d(TAG, "Force Stop button (Text) is disabled for $currentPackage")
+                verifyAndContinue()
+                return true
             }
         }
         return false
+    }
+
+    private fun verifyAndContinue() {
+        val pkg = currentPackage ?: return
+        FreezeStatusObserver.notifyPackageFrozen(pkg)
+        goBackAndContinue()
     }
 
     private fun performAggressiveClick(node: AccessibilityNodeInfo): Boolean {
@@ -262,12 +277,30 @@ class FreezeAccessibilityService : AccessibilityService() {
     }
 
     private fun goBackAndContinue() {
+        if (isWaitingForNext) return
+        isWaitingForNext = true
+        mainHandler.removeCallbacksAndMessages("retry_all")
+        
         mainHandler.postDelayed({
-            returnToMainApp(this)
+            // 1. Try to close the settings screen
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            
             mainHandler.postDelayed({
-                processNext(this)
-            }, 700)
-        }, 300)
+                // 2. Verification and notification
+                val pkg = currentPackage
+                if (pkg != null && RunningPackageHelper.isPackageStopped(this, pkg)) {
+                    Log.d(TAG, "Verification SUCCESS: $pkg is stopped.")
+                    FreezeStatusObserver.notifyPackageFrozen(pkg)
+                }
+
+                // 3. Return to main app
+                returnToMainApp(this)
+                
+                mainHandler.postDelayed({
+                    processNext(this)
+                }, 500)
+            }, 300)
+        }, 500) // Aggressive wait after action
     }
 
     override fun onInterrupt() {}

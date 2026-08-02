@@ -7,6 +7,7 @@ import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.appcompat.app.AppCompatActivity
 import com.example.appsapp.databinding.ActivityMainBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class MainActivity : AppCompatActivity() {
 
@@ -15,6 +16,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (isFirstLaunch()) {
+            showFirstLaunchDialog()
+        }
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -30,6 +35,37 @@ class MainActivity : AppCompatActivity() {
             )
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
+    }
+
+    private fun isFirstLaunch(): Boolean {
+        val sharedPref = getPreferences(MODE_PRIVATE)
+        return sharedPref.getBoolean("first_launch", true)
+    }
+
+    private fun setFirstLaunchDone() {
+        val sharedPref = getPreferences(MODE_PRIVATE)
+        with(sharedPref.edit()) {
+            putBoolean("first_launch", false)
+            apply()
+        }
+    }
+
+    private fun showFirstLaunchDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Permissions Required")
+            .setMessage("To function correctly, Batterify requires Accessibility and Usage Access permissions.\n\n" +
+                    "This app is open-source and respects your privacy. Its ONLY purpose is to force-stop background applications to save your battery. " +
+                    "You can review the code at any time to verify its safety.\n\n" +
+                    "Do you accept these terms and want to proceed?")
+            .setPositiveButton("I Accept") { dialog, _ ->
+                setFirstLaunchDone()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     override fun onSupportNavigateUp(): Boolean {

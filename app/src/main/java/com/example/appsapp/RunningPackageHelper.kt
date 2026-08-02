@@ -139,7 +139,7 @@ class RunningPackageHelper {
             }
         }
         
-        private fun getApplicationLabel(context: Context, packageName: String): String {
+        fun getApplicationLabel(context: Context, packageName: String): String {
             return try {
                 val packageInfo = context.packageManager.getPackageInfo(packageName, 0)
                 val appInfo = packageInfo.applicationInfo

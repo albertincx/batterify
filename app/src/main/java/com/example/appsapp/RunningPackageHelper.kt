@@ -44,6 +44,7 @@ class RunningPackageHelper {
                         if (
                             !usageStat.packageName.startsWith("com.android")
                             && !usageStat.packageName.startsWith("com.google.android")
+                            && !usageStat.packageName.startsWith("android")
                             && usageStat.packageName != context.packageName
                         ) {
                             runningPackages.add(
@@ -81,6 +82,7 @@ class RunningPackageHelper {
                 // Filter out system processes
                 if (!packageName.startsWith("com.android") 
                     && !packageName.startsWith("com.google.android")
+                    && !packageName.startsWith("android")
                     && packageName != context.packageName
                     && !packageName.startsWith("system:")
                     && !packageName.startsWith("com.miui")) { // Additional filter for MIUI system apps

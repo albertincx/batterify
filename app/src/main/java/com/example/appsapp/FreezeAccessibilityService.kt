@@ -30,6 +30,9 @@ class FreezeAccessibilityService : AccessibilityService() {
             packageQueue.addAll(filtered)
             isProcessing = true
             mainButtonClicked = false
+            Log.d(TAG, "")
+            Log.d(TAG, "")
+            Log.d(TAG, "CALL1: $isProcessing")
             processNext(context)
         }
 
@@ -37,12 +40,14 @@ class FreezeAccessibilityService : AccessibilityService() {
             currentPackage = packageQueue.poll()
             mainButtonClicked = false
             isWaitingForNext = false
+            Log.d(TAG, "POLL: $currentPackage CTX ${context.packageName}")
 
             if (currentPackage != null) {
                 if (currentPackage == context.packageName) {
 //                    mainHandler.postDelayed({
 //                        processNext(context)
 //                    }, 400)
+                    Log.d(TAG, "")
                     Log.d(TAG, "SKIP: $currentPackage")
                     processNext(context)
                     return
@@ -55,6 +60,7 @@ class FreezeAccessibilityService : AccessibilityService() {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
+//                intent.let { context.startActivity(it) }
             } else {
                 isProcessing = false
                 Log.d(TAG, "")
@@ -132,34 +138,50 @@ class FreezeAccessibilityService : AccessibilityService() {
 
         // 1. Prioritize android:id/button1 (The "Positive" button in standard dialogs)
         val buttons = root.findAccessibilityNodeInfosByViewId("android:id/button1")
-        if (!buttons.isNullOrEmpty()) {
-            for (node in buttons) {
-                if (node.isVisibleToUser && node.isEnabled) {
-                    if (performAggressiveClick(node)) {
-                        Log.d(TAG, "Confirmed dialog via button1 for $currentPackage")
-                        currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                        isWaitingForNext = true
-                        mainHandler.postDelayed({
-                            goBackAndContinue()
-                        }, 2000)
-                        return true
-                    }
-                }
-            }
-        }
+//        if (!buttons.isNullOrEmpty()) {
+//            for (node in buttons) {
+//                Log.d(TAG, "")
+//                Log.d(TAG, "")
+//                Log.d(TAG, "")
+//                Log.d(TAG, "")
+//                Log.d(TAG, " node: ${node}")
+//                if (node.isVisibleToUser && node.isEnabled) {
+//                    if (performAggressiveClick(node)) {
+//                        Log.d(TAG, "Confirmed dialog via button1 for $currentPackage")
+//                        currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+//                        isWaitingForNext = true
+//                        mainHandler.postDelayed({
+//                            goBackAndContinue()
+//                        }, 2000)
+//                        return true
+//                    }
+//                }
+//            }
+//        }
 
         // 2. Search for clickable nodes matching text
         val clickableNode = recursiveSearchClickable(root, dialogTexts)
         if (clickableNode != null) {
+            Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.uniqueId}")
+            Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.windowId}")
             Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.text}")
+            Log.d(TAG, "TRY CLICK")
             if (performAggressiveClick(clickableNode)) {
                 Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
-                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+//                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                 isWaitingForNext = true
-                mainHandler.postDelayed({
+                val nodeText = clickableNode.text?.toString()?.uppercase() ?: ""
+                Log.d(TAG, "Found clickable dialog button via is: ${nodeText == "OK"}")
+                if (nodeText == "OK") {
                     goBackAndContinue()
-                }, 2000)
+//                    mainHandler.postDelayed({
+//                        goBackAndContinue()
+//                    }, 2000)
+                }
                 return true
+            } else {
+                Log.d(TAG, "TRY CLICK FALSE")
+                return false
             }
         }
 
@@ -234,12 +256,24 @@ class FreezeAccessibilityService : AccessibilityService() {
     }
 
     private fun performAggressiveClick(node: AccessibilityNodeInfo): Boolean {
-        if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+        if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            Log.d(TAG, "CLICK FIRST CLICKABLE")
+            return true
+        }
         var parent = node.parent
         while (parent != null) {
-            if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                Log.d(TAG, "CLICK WHILE TRUE")
+                return true
+            }
             parent = parent.parent
         }
+
+        if (node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            Log.d(TAG, "CLICK NODE !!! TRUE")
+            return true
+        }
+        Log.d(TAG, "CLICK NODE LAST")
         return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
@@ -294,7 +328,22 @@ class FreezeAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun returnMain() {
+        mainHandler.postDelayed({
+            returnToMainApp(this)
+//            mainHandler.postDelayed({
+//                processNext(this)
+//            }, 400)
+        }, 300)
+    }
+
     private fun goBackAndContinue() {
+//        mainHandler.postDelayed({
+//            Log.d(TAG, "")
+//            Log.d(TAG, "")
+//            Log.d(TAG, "processNext: $isProcessing")
+//            processNext(this)
+//        }, 400)
         mainHandler.postDelayed({
             returnToMainApp(this)
             mainHandler.postDelayed({

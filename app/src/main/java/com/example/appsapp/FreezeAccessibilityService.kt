@@ -58,6 +58,8 @@ class FreezeAccessibilityService : AccessibilityService() {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.parse("package:$currentPackage")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                    addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
                 }
                 context.startActivity(intent)
 //                intent.let { context.startActivity(it) }
@@ -168,15 +170,14 @@ class FreezeAccessibilityService : AccessibilityService() {
             Log.d(TAG, "TRY CLICK")
             if (performAggressiveClick(clickableNode)) {
                 Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
-//                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                 isWaitingForNext = true
                 val nodeText = clickableNode.text?.toString()?.uppercase() ?: ""
                 Log.d(TAG, "Found clickable dialog button via is: ${nodeText == "OK"}")
                 if (nodeText == "OK") {
+                    // close current intent
+//                    performGlobalAction(GLOBAL_ACTION_BACK)
                     goBackAndContinue()
-//                    mainHandler.postDelayed({
-//                        goBackAndContinue()
-//                    }, 2000)
                 }
                 return true
             } else {
@@ -338,13 +339,8 @@ class FreezeAccessibilityService : AccessibilityService() {
     }
 
     private fun goBackAndContinue() {
-//        mainHandler.postDelayed({
-//            Log.d(TAG, "")
-//            Log.d(TAG, "")
-//            Log.d(TAG, "processNext: $isProcessing")
-//            processNext(this)
-//        }, 400)
         mainHandler.postDelayed({
+            performGlobalAction(GLOBAL_ACTION_BACK)
             returnToMainApp(this)
             mainHandler.postDelayed({
                 processNext(this)

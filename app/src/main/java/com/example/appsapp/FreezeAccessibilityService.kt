@@ -20,6 +20,7 @@ class FreezeAccessibilityService : AccessibilityService() {
         private var isProcessing = false
         private var currentPackage: String? = null
         private var mainButtonClicked = false
+        private var isWaitingForNext = false
         private var lastActionTime = 0L
         private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -35,6 +36,7 @@ class FreezeAccessibilityService : AccessibilityService() {
         private fun processNext(context: Context) {
             currentPackage = packageQueue.poll()
             mainButtonClicked = false
+            isWaitingForNext = false
 
             if (currentPackage != null) {
                 if (currentPackage == context.packageName) {
@@ -77,7 +79,7 @@ class FreezeAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (!isProcessing) return
+        if (!isProcessing || isWaitingForNext) return
 
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val nodeId = event.source?.viewIdResourceName
@@ -136,7 +138,10 @@ class FreezeAccessibilityService : AccessibilityService() {
                     if (performAggressiveClick(node)) {
                         Log.d(TAG, "Confirmed dialog via button1 for $currentPackage")
                         currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                        goBackAndContinue()
+                        isWaitingForNext = true
+                        mainHandler.postDelayed({
+                            goBackAndContinue()
+                        }, 2000)
                         return true
                     }
                 }
@@ -150,7 +155,10 @@ class FreezeAccessibilityService : AccessibilityService() {
             if (performAggressiveClick(clickableNode)) {
                 Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
                 currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                goBackAndContinue()
+                isWaitingForNext = true
+                mainHandler.postDelayed({
+                    goBackAndContinue()
+                }, 2000)
                 return true
             }
         }
@@ -191,7 +199,10 @@ class FreezeAccessibilityService : AccessibilityService() {
                     } else {
                         Log.d(TAG, "Main button disabled, skipping $currentPackage")
                         currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                        goBackAndContinue()
+                        isWaitingForNext = true
+                        mainHandler.postDelayed({
+                            goBackAndContinue()
+                        }, 2000)
                         return true
                     }
                 }
@@ -211,7 +222,10 @@ class FreezeAccessibilityService : AccessibilityService() {
                 } else {
                     Log.d(TAG, "Main button (Text) disabled, skipping $currentPackage")
                     currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                    goBackAndContinue()
+                    isWaitingForNext = true
+                    mainHandler.postDelayed({
+                        goBackAndContinue()
+                    }, 2000)
                     return true
                 }
             }
@@ -286,7 +300,7 @@ class FreezeAccessibilityService : AccessibilityService() {
             mainHandler.postDelayed({
                 processNext(this)
             }, 400)
-        }, 2000)
+        }, 300)
     }
 
     override fun onInterrupt() {}

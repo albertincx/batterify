@@ -19,9 +19,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.appsapp.FreezeAccessibilityService
 import com.example.appsapp.FreezeStatusObserver
-import com.example.appsapp.PackageKiller
 import com.example.appsapp.RunningPackageHelper
 import com.example.appsapp.R
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -31,8 +32,12 @@ class RunningPackagesFragment : Fragment() {
     private lateinit var refreshButton: Button
     private lateinit var freezeButton: Button
     private lateinit var accessibilityButton: Button
+    private lateinit var usageStatsButton: Button
     private lateinit var selectAllCheckBox: CheckBox
+    private lateinit var selectActiveCheckBox: CheckBox
+    private lateinit var tabLayout: TabLayout
     private lateinit var adapter: RunningPackagesAdapter
+    private var isInitialLoad = true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -45,7 +50,10 @@ class RunningPackagesFragment : Fragment() {
         refreshButton = root.findViewById(R.id.refresh_button)
         freezeButton = root.findViewById(R.id.freeze_button)
         accessibilityButton = root.findViewById(R.id.accessibility_button)
+        usageStatsButton = root.findViewById(R.id.usage_stats_button)
         selectAllCheckBox = root.findViewById(R.id.selectAllCheckBox)
+        selectActiveCheckBox = root.findViewById(R.id.selectActiveCheckBox)
+        tabLayout = root.findViewById(R.id.tabLayout)
 
         recyclerView.layoutManager = LinearLayoutManager(context)
 
@@ -62,14 +70,36 @@ class RunningPackagesFragment : Fragment() {
             startActivity(intent)
         }
 
+        usageStatsButton.setOnClickListener {
+            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            startActivity(intent)
+        }
+
         selectAllCheckBox.setOnCheckedChangeListener { _, isChecked ->
             if (::adapter.isInitialized) {
                 adapter.selectAll(isChecked)
             }
         }
 
+        selectActiveCheckBox.setOnCheckedChangeListener { _, isChecked ->
+            if (::adapter.isInitialized) {
+                adapter.selectAllActive(isChecked)
+            }
+        }
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                if (::adapter.isInitialized) {
+                    adapter.updateFilter(tab?.position == 1)
+                    updateSelectActiveVisibility()
+                }
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
+
         loadRunningPackages()
-        updateAccessibilityStatus()
+        updatePermissionStatuses()
         observeFreezeStatus()
 
         return root
@@ -83,24 +113,40 @@ class RunningPackagesFragment : Fragment() {
                     if (pos != -1) {
                         android.util.Log.d("RunningPackages", "Marked $packageName as frozen in UI")
                     }
+                    updateSelectActiveVisibility()
                 }
             }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateAccessibilityStatus()
+    private fun updateSelectActiveVisibility() {
+        if (::adapter.isInitialized) {
+            selectActiveCheckBox.visibility = if (adapter.hasActivePackages()) View.VISIBLE else if (tabLayout.selectedTabPosition == 1) View.GONE else View.INVISIBLE
+        }
     }
 
-    private fun updateAccessibilityStatus() {
-        val enabled = isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)
-        if (enabled) {
+    override fun onResume() {
+        super.onResume()
+        updatePermissionStatuses()
+    }
+
+    private fun updatePermissionStatuses() {
+        val accessibilityEnabled = isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)
+        if (accessibilityEnabled) {
             accessibilityButton.text = "Accessibility On"
             accessibilityButton.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
         } else {
             accessibilityButton.text = "Accessibility Off"
             accessibilityButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
+        }
+
+        val usageStatsEnabled = RunningPackageHelper.hasUsageStatsPermission(requireContext())
+        if (usageStatsEnabled) {
+            usageStatsButton.text = "Usage Stats On"
+            usageStatsButton.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
+        } else {
+            usageStatsButton.text = "Usage Stats Off"
+            usageStatsButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
         }
     }
 
@@ -122,6 +168,29 @@ class RunningPackagesFragment : Fragment() {
             openAppInfo(runningPackage.packageName)
         }
         recyclerView.adapter = adapter
+        adapter.updateFilter(tabLayout.selectedTabPosition == 1)
+        updateSelectActiveVisibility()
+
+        if (isInitialLoad) {
+            if (!adapter.hasActivePackages()) {
+                showNoActiveAppsDialog()
+            }
+            isInitialLoad = false
+        }
+    }
+
+    private fun showNoActiveAppsDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("No Active Apps")
+            .setMessage("All applications are already optimized. There are no active processes to stop.")
+            .setPositiveButton("Close App") { _, _ ->
+                requireActivity().finish()
+            }
+            .setNegativeButton("Continue") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     private fun freezeSelectedPackages() {

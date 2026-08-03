@@ -54,9 +54,9 @@ class MainActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle("Permissions Required")
             .setMessage("To function correctly, Batterify requires Accessibility and Usage Access permissions.\n\n" +
-                    "This app is open-source and respects your privacy. Its ONLY purpose is to force-stop background applications to save your battery. " +
-                    "You can review the code at any time to verify its safety.\n\n" +
-                    "Do you accept these terms and want to proceed?")
+                    "This app is open-source and respects your privacy. Its ONLY purpose is to force-stop background applications to save your battery.\n\n" +
+                    "You can verify the source code and build it yourself for proof: https://github.com/albertincx/batterify\n\n" +
+                    "Your data is under your control. Do you accept these terms and want to proceed?")
             .setPositiveButton("I Accept") { dialog, _ ->
                 setFirstLaunchDone()
                 dialog.dismiss()

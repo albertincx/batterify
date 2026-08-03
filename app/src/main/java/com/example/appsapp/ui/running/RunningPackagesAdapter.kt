@@ -7,17 +7,29 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.example.appsapp.PackageKiller
 import com.example.appsapp.R
 import com.example.appsapp.RunningPackage
-
+import com.example.appsapp.RunningPackageHelper
 import android.content.Context
 
 class RunningPackagesAdapter(
     private val context: Context,
-    private val runningPackages: MutableList<RunningPackage>,
+    private val allPackages: MutableList<RunningPackage>,
     private val onKillClick: (RunningPackage) -> Unit
 ) : RecyclerView.Adapter<RunningPackagesAdapter.RunningPackageViewHolder>() {
+
+    private var filteredPackages: List<RunningPackage> = emptyList()
+    private var showHiddenOnly: Boolean = false
+
+    init {
+        updateFilter(false)
+    }
+
+    fun updateFilter(showHidden: Boolean) {
+        showHiddenOnly = showHidden
+        filteredPackages = allPackages.filter { it.isHidden == showHiddenOnly }
+        notifyDataSetChanged()
+    }
 
     class RunningPackageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val appNameTextView: TextView = itemView.findViewById(R.id.appNameTextView)
@@ -34,9 +46,15 @@ class RunningPackagesAdapter(
     }
 
     override fun onBindViewHolder(holder: RunningPackageViewHolder, position: Int) {
-        val runningPackage = runningPackages[position]
+        val runningPackage = filteredPackages[position]
         
-        holder.appNameTextView.text = runningPackage.appName
+        val displayAppName = if (runningPackage.appName.length > 50) {
+            runningPackage.appName.substring(0, 30) + "..."
+        } else {
+            runningPackage.appName
+        }
+
+        holder.appNameTextView.text = displayAppName
         holder.packageNameTextView.text = runningPackage.packageName
         
         // Handle frozen state
@@ -44,7 +62,7 @@ class RunningPackagesAdapter(
             holder.packageCheckBox.isEnabled = false
             holder.packageCheckBox.isChecked = false
             holder.itemView.alpha = 0.5f
-            holder.appNameTextView.text = "${runningPackage.appName} (Frozen)"
+            holder.appNameTextView.text = "$displayAppName (Dead)"
         } else {
             holder.packageCheckBox.isEnabled = true
             holder.itemView.alpha = 1.0f
@@ -68,13 +86,16 @@ class RunningPackagesAdapter(
             }
         }
         
+        holder.hideButton.text = if (runningPackage.isHidden) "Unhide" else "Hide"
         holder.hideButton.setOnClickListener {
-            runningPackage.isVisible = false
-            val pos = holder.adapterPosition
-            if (pos != RecyclerView.NO_POSITION) {
-                runningPackages.removeAt(pos)
-                notifyItemRemoved(pos)
+            if (runningPackage.isHidden) {
+                RunningPackageHelper.unhidePackage(context, runningPackage.packageName)
+                runningPackage.isHidden = false
+            } else {
+                RunningPackageHelper.hidePackage(context, runningPackage.packageName)
+                runningPackage.isHidden = true
             }
+            updateFilter(showHiddenOnly)
         }
         
         holder.actionButton.setOnClickListener {
@@ -82,26 +103,43 @@ class RunningPackagesAdapter(
         }
     }
 
-    override fun getItemCount(): Int = runningPackages.size
+    override fun getItemCount(): Int = filteredPackages.size
     
     fun selectAll(select: Boolean) {
-        runningPackages.forEach { it.isSelected = select }
+        filteredPackages.forEach { 
+            if (!it.isFrozen) {
+                it.isSelected = select 
+            }
+        }
+        notifyDataSetChanged()
+    }
+
+    fun selectAllActive(select: Boolean) {
+        filteredPackages.forEach { 
+            if (!it.isFrozen && !it.isHidden) {
+                it.isSelected = select 
+            }
+        }
         notifyDataSetChanged()
     }
 
     fun getSelectedPackages(): List<RunningPackage> {
-        return runningPackages.filter { it.isSelected && !it.isFrozen }
+        return allPackages.filter { it.isSelected && !it.isFrozen }
+    }
+
+    fun hasActivePackages(): Boolean {
+        return allPackages.any { !it.isFrozen && !it.isHidden }
     }
 
     fun updatePackageFrozen(packageName: String): Int {
-        val index = runningPackages.indexOfFirst { it.packageName == packageName }
+        val index = allPackages.indexOfFirst { it.packageName == packageName }
         if (index != -1) {
-            runningPackages[index].isFrozen = true
-            runningPackages[index].isSelected = false
-            runningPackages[index].frozenTimestamp = System.currentTimeMillis()
+            allPackages[index].isFrozen = true
+            allPackages[index].isSelected = false
+            allPackages[index].frozenTimestamp = System.currentTimeMillis()
             
-            // Re-sort the list: running apps first (alphabetical), then frozen apps (descending timestamp)
-            runningPackages.sortWith(Comparator { p1, p2 ->
+            // Re-sort the master list
+            allPackages.sortWith(Comparator { p1, p2 ->
                 if (p1.isFrozen != p2.isFrozen) {
                     p1.isFrozen.compareTo(p2.isFrozen)
                 } else if (p1.isFrozen) {
@@ -110,7 +148,7 @@ class RunningPackagesAdapter(
                     p1.appName.compareTo(p2.appName, ignoreCase = true)
                 }
             })
-            notifyDataSetChanged()
+            updateFilter(showHiddenOnly)
         }
         return index
     }

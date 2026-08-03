@@ -1,10 +1,8 @@
 package com.example.appsapp
 
 import android.app.ActivityManager
-import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 
 data class RunningPackage(
@@ -15,12 +13,17 @@ data class RunningPackage(
     var isVisible: Boolean = true,
     var isSelected: Boolean = false,
     var isFrozen: Boolean = false,
-    var frozenTimestamp: Long = 0L
+    var frozenTimestamp: Long = 0L,
+    var isHidden: Boolean = false
 )
 
 class RunningPackageHelper {
     companion object {
+        private const val PREFS_NAME = "batterify_prefs"
+        private const val HIDDEN_PACKAGES_KEY = "hidden_packages"
+
         fun getRunningPackages(context: Context): List<RunningPackage> {
+            val hiddenPackages = getHiddenPackages(context)
             val runningPackages = mutableListOf<RunningPackage>()
             
             // Check if we have usage stats permission
@@ -57,7 +60,8 @@ class RunningPackageHelper {
                                     appName = getApplicationLabel(context, usageStat.packageName),
                                     isVisible = true,
                                     isFrozen = isFrozen,
-                                    frozenTimestamp = if (isFrozen) 1L else 0L // Placeholder for existing frozen apps
+                                    frozenTimestamp = if (isFrozen) 1L else 0L, // Placeholder for existing frozen apps
+                                    isHidden = hiddenPackages.contains(usageStat.packageName)
                                 )
                             )
                         }
@@ -72,7 +76,8 @@ class RunningPackageHelper {
                         processId = android.os.Process.myPid(),
                         appName = getApplicationLabel(context, context.packageName),
                         isVisible = true,
-                        isFrozen = false // Current app is obviously running
+                        isFrozen = false, // Current app is obviously running
+                        isHidden = hiddenPackages.contains(context.packageName)
                     )
                 )
             }
@@ -100,7 +105,8 @@ class RunningPackageHelper {
                                 appName = getApplicationLabel(context, packageName),
                                 isVisible = true,
                                 isFrozen = isFrozen,
-                                frozenTimestamp = if (isFrozen) 1L else 0L
+                                frozenTimestamp = if (isFrozen) 1L else 0L,
+                                isHidden = hiddenPackages.contains(packageName)
                             )
                         )
                     }
@@ -128,7 +134,7 @@ class RunningPackageHelper {
             }
         }
         
-        private fun hasUsageStatsPermission(context: Context): Boolean {
+        fun hasUsageStatsPermission(context: Context): Boolean {
             return try {
                 val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
                 val currentTime = System.currentTimeMillis()
@@ -161,6 +167,28 @@ class RunningPackageHelper {
             } catch (e: Exception) {
                 packageName // Return package name if we can't get the label
             }
+        }
+
+        fun hidePackage(context: Context, packageName: String) {
+            val hidden = getHiddenPackages(context).toMutableSet()
+            hidden.add(packageName)
+            saveHiddenPackages(context, hidden)
+        }
+
+        fun unhidePackage(context: Context, packageName: String) {
+            val hidden = getHiddenPackages(context).toMutableSet()
+            hidden.remove(packageName)
+            saveHiddenPackages(context, hidden)
+        }
+
+        private fun getHiddenPackages(context: Context): Set<String> {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getStringSet(HIDDEN_PACKAGES_KEY, emptySet()) ?: emptySet()
+        }
+
+        private fun saveHiddenPackages(context: Context, packages: Set<String>) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putStringSet(HIDDEN_PACKAGES_KEY, packages).apply()
         }
     }
 }

@@ -3,7 +3,6 @@ package com.example.appsapp.ui.running
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.CheckBox
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -11,6 +10,8 @@ import com.example.appsapp.R
 import com.example.appsapp.RunningPackage
 import com.example.appsapp.RunningPackageHelper
 import android.content.Context
+import android.widget.ImageButton
+import androidx.appcompat.widget.PopupMenu
 
 class RunningPackagesAdapter(
     private val context: Context,
@@ -37,9 +38,7 @@ class RunningPackagesAdapter(
         val appNameTextView: TextView = itemView.findViewById(R.id.appNameTextView)
         val packageNameTextView: TextView = itemView.findViewById(R.id.packageNameTextView)
         val packageCheckBox: CheckBox = itemView.findViewById(R.id.packageCheckBox)
-        val hideButton: Button = itemView.findViewById(R.id.hideButton)
-        val killItemButton: Button = itemView.findViewById(R.id.killItemButton)
-        val actionButton: Button = itemView.findViewById(R.id.actionButton)
+        val menuButton: ImageButton = itemView.findViewById(R.id.menuButton)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RunningPackageViewHolder {
@@ -66,11 +65,9 @@ class RunningPackagesAdapter(
             holder.packageCheckBox.isChecked = false
             holder.itemView.alpha = 0.5f
             holder.appNameTextView.text = "$displayAppName (Dead)"
-            holder.killItemButton.visibility = View.GONE
         } else {
             holder.packageCheckBox.isEnabled = true
             holder.itemView.alpha = 1.0f
-            holder.killItemButton.visibility = View.VISIBLE
         }
         
         // Remove listener first to avoid trigger when setting state
@@ -92,26 +89,50 @@ class RunningPackagesAdapter(
             }
         }
         
-        holder.hideButton.text = if (runningPackage.isHidden) "Unhide" else "Hide"
-        holder.hideButton.setOnClickListener {
-            if (runningPackage.isHidden) {
-                RunningPackageHelper.unhidePackage(context, runningPackage.packageName)
-                runningPackage.isHidden = false
-            } else {
-                RunningPackageHelper.hidePackage(context, runningPackage.packageName)
-                runningPackage.isHidden = true
-            }
-            updateFilter(showHiddenOnly)
-            onSelectionChanged()
+        holder.menuButton.setOnClickListener { view ->
+            showPopupMenu(view, runningPackage)
+        }
+    }
+
+    private fun showPopupMenu(view: View, runningPackage: RunningPackage) {
+        val popup = PopupMenu(context, view)
+        
+        // Add items manually
+        val hideTitle = if (runningPackage.isHidden) "Unhide" else "Hide"
+        popup.menu.add(0, 1, 0, hideTitle)
+        
+        if (!runningPackage.isFrozen) {
+            popup.menu.add(0, 2, 1, "Kill")
         }
         
-        holder.killItemButton.setOnClickListener {
-            onKillClick(runningPackage)
-        }
+        popup.menu.add(0, 3, 2, "Info")
 
-        holder.actionButton.setOnClickListener {
-            onInfoClick(runningPackage)
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> { // Hide/Unhide
+                    if (runningPackage.isHidden) {
+                        RunningPackageHelper.unhidePackage(context, runningPackage.packageName)
+                        runningPackage.isHidden = false
+                    } else {
+                        RunningPackageHelper.hidePackage(context, runningPackage.packageName)
+                        runningPackage.isHidden = true
+                    }
+                    updateFilter(showHiddenOnly)
+                    onSelectionChanged()
+                    true
+                }
+                2 -> { // Kill
+                    onKillClick(runningPackage)
+                    true
+                }
+                3 -> { // Info
+                    onInfoClick(runningPackage)
+                    true
+                }
+                else -> false
+            }
         }
+        popup.show()
     }
 
     override fun getItemCount(): Int = filteredPackages.size

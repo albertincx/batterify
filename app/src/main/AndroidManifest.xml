@@ -26,7 +26,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="com.oasisfeng.island.permission.FREEZE_PACKAGE"/>
     <uses-permission android:name="com.oasisfeng.island.permission.SUSPEND_PACKAGE"/>
-    <uses-permission android:name="android.permission.GET_TASKS" />
     <!-- Permission to kill background processes (note: limited effectiveness on modern Android) -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 

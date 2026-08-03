@@ -138,29 +138,6 @@ class FreezeAccessibilityService : AccessibilityService() {
         // Pixel 6a specific: button is likely "OK" or "Force stop" (NO question mark)
         val dialogTexts = listOf("OK", "ОК", "Force stop", "Остановить")
 
-        // 1. Prioritize android:id/button1 (The "Positive" button in standard dialogs)
-        val buttons = root.findAccessibilityNodeInfosByViewId("android:id/button1")
-//        if (!buttons.isNullOrEmpty()) {
-//            for (node in buttons) {
-//                Log.d(TAG, "")
-//                Log.d(TAG, "")
-//                Log.d(TAG, "")
-//                Log.d(TAG, "")
-//                Log.d(TAG, " node: ${node}")
-//                if (node.isVisibleToUser && node.isEnabled) {
-//                    if (performAggressiveClick(node)) {
-//                        Log.d(TAG, "Confirmed dialog via button1 for $currentPackage")
-//                        currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-//                        isWaitingForNext = true
-//                        mainHandler.postDelayed({
-//                            goBackAndContinue()
-//                        }, 2000)
-//                        return true
-//                    }
-//                }
-//            }
-//        }
-
         // 2. Search for clickable nodes matching text
         val clickableNode = recursiveSearchClickable(root, dialogTexts)
         if (clickableNode != null) {
@@ -289,7 +266,7 @@ class FreezeAccessibilityService : AccessibilityService() {
             val target = text.uppercase()
             // Strict match for text to avoid matching titles like "Force stop?"
             val matches =
-                nodeText == target || nodeText.startsWith(target + " ") || contentDesc == target
+                nodeText == target || nodeText.startsWith("$target ") || contentDesc == target
 
             if (matches) {
                 // Check if this node or any parent is clickable
@@ -327,15 +304,6 @@ class FreezeAccessibilityService : AccessibilityService() {
             val child = node.getChild(i) ?: continue
             dumpNodes(child, depth + 1)
         }
-    }
-
-    private fun returnMain() {
-        mainHandler.postDelayed({
-            returnToMainApp(this)
-//            mainHandler.postDelayed({
-//                processNext(this)
-//            }, 400)
-        }, 300)
     }
 
     private fun goBackAndContinue() {

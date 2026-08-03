@@ -98,7 +98,19 @@ class RunningPackagesAdapter(
         if (index != -1) {
             runningPackages[index].isFrozen = true
             runningPackages[index].isSelected = false
-            notifyItemChanged(index)
+            runningPackages[index].frozenTimestamp = System.currentTimeMillis()
+            
+            // Re-sort the list: running apps first (alphabetical), then frozen apps (descending timestamp)
+            runningPackages.sortWith(Comparator { p1, p2 ->
+                if (p1.isFrozen != p2.isFrozen) {
+                    p1.isFrozen.compareTo(p2.isFrozen)
+                } else if (p1.isFrozen) {
+                    p2.frozenTimestamp.compareTo(p1.frozenTimestamp) // Recently frozen first
+                } else {
+                    p1.appName.compareTo(p2.appName, ignoreCase = true)
+                }
+            })
+            notifyDataSetChanged()
         }
         return index
     }

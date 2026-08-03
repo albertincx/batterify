@@ -14,7 +14,8 @@ data class RunningPackage(
     val appName: String,
     var isVisible: Boolean = true,
     var isSelected: Boolean = false,
-    var isFrozen: Boolean = false
+    var isFrozen: Boolean = false,
+    var frozenTimestamp: Long = 0L
 )
 
 class RunningPackageHelper {
@@ -47,6 +48,7 @@ class RunningPackageHelper {
                             && !usageStat.packageName.startsWith("android")
                             && usageStat.packageName != context.packageName
                         ) {
+                            val isFrozen = isPackageStopped(context, usageStat.packageName)
                             runningPackages.add(
                                 RunningPackage(
                                     packageName = usageStat.packageName,
@@ -54,7 +56,8 @@ class RunningPackageHelper {
                                     processId = -1, // UsageStats doesn't provide PID
                                     appName = getApplicationLabel(context, usageStat.packageName),
                                     isVisible = true,
-                                    isFrozen = isPackageStopped(context, usageStat.packageName)
+                                    isFrozen = isFrozen,
+                                    frozenTimestamp = if (isFrozen) 1L else 0L // Placeholder for existing frozen apps
                                 )
                             )
                         }
@@ -88,6 +91,7 @@ class RunningPackageHelper {
                     && !packageName.startsWith("com.miui")) { // Additional filter for MIUI system apps
                     // Only add if not already in the list from usage stats
                     if (!runningPackages.any { it.packageName == packageName }) {
+                        val isFrozen = isPackageStopped(context, packageName)
                         runningPackages.add(
                             RunningPackage(
                                 packageName = packageName,
@@ -95,14 +99,24 @@ class RunningPackageHelper {
                                 processId = processInfo.pid,
                                 appName = getApplicationLabel(context, packageName),
                                 isVisible = true,
-                                isFrozen = isPackageStopped(context, packageName)
+                                isFrozen = isFrozen,
+                                frozenTimestamp = if (isFrozen) 1L else 0L
                             )
                         )
                     }
                 }
             }
             
-            return runningPackages.distinctBy { it.packageName } // Remove duplicates
+            return runningPackages.distinctBy { it.packageName }
+                .sortedWith(Comparator { p1, p2 ->
+                    if (p1.isFrozen != p2.isFrozen) {
+                        p1.isFrozen.compareTo(p2.isFrozen) // Running (false/0) first
+                    } else if (p1.isFrozen) {
+                        p2.frozenTimestamp.compareTo(p1.frozenTimestamp) // Recently frozen first
+                    } else {
+                        p1.appName.compareTo(p2.appName, ignoreCase = true) // Alphabetical for running
+                    }
+                })
         }
         
         fun isPackageStopped(context: Context, packageName: String): Boolean {

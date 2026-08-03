@@ -50,6 +50,9 @@ class RunningPackagesAdapter(
     override fun onBindViewHolder(holder: RunningPackageViewHolder, position: Int) {
         val runningPackage = filteredPackages[position]
         
+        // Remove listener first to avoid trigger when setting state
+        holder.packageCheckBox.setOnCheckedChangeListener(null)
+
         val displayAppName = if (runningPackage.appName.length > 50) {
             runningPackage.appName.substring(0, 30) + "..."
         } else {
@@ -70,8 +73,6 @@ class RunningPackagesAdapter(
             holder.itemView.alpha = 1.0f
         }
         
-        // Remove listener first to avoid trigger when setting state
-        holder.packageCheckBox.setOnCheckedChangeListener(null)
         if (!runningPackage.isFrozen) {
             holder.packageCheckBox.isChecked = runningPackage.isSelected
         }

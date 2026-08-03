@@ -51,6 +51,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".PolicyActivity"
+            android:exported="false"
+            android:label="Privacy Policy"
+            android:theme="@style/Theme.AppsApp.NoActionBar" />
+
         <service
             android:name=".FreezeAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

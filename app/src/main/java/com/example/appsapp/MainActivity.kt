@@ -1,6 +1,9 @@
 package com.example.appsapp
 
+import android.content.Intent
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
@@ -61,11 +64,29 @@ class MainActivity : AppCompatActivity() {
                 setFirstLaunchDone()
                 dialog.dismiss()
             }
+            .setNeutralButton("Privacy Policy") { _, _ ->
+                startActivity(Intent(this, PolicyActivity::class.java))
+            }
             .setNegativeButton("Cancel") { _, _ ->
                 finish()
             }
             .setCancelable(false)
             .show()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_policy -> {
+                startActivity(Intent(this, PolicyActivity::class.java))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {

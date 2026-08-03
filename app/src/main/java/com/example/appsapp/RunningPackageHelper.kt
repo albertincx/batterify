@@ -45,12 +45,7 @@ class RunningPackageHelper {
                         .take(50) // Take the 50 most recently used apps
                     
                     mostRecentStats.forEach { usageStat ->
-                        if (
-                            !usageStat.packageName.startsWith("com.android")
-                            && !usageStat.packageName.startsWith("com.google.android")
-                            && !usageStat.packageName.startsWith("android")
-                            && usageStat.packageName != context.packageName
-                        ) {
+                        if (!isSystemPackage(usageStat.packageName, context.packageName)) {
                             val isFrozen = isPackageStopped(context, usageStat.packageName)
                             runningPackages.add(
                                 RunningPackage(
@@ -88,12 +83,7 @@ class RunningPackageHelper {
             appProcesses?.forEach { processInfo ->
                 val packageName = processInfo.processName
                 // Filter out system processes
-                if (!packageName.startsWith("com.android") 
-                    && !packageName.startsWith("com.google.android")
-                    && !packageName.startsWith("android")
-                    && packageName != context.packageName
-                    && !packageName.startsWith("system:")
-                    && !packageName.startsWith("com.miui")) { // Additional filter for MIUI system apps
+                if (!isSystemPackage(packageName, context.packageName)) {
                     // Only add if not already in the list from usage stats
                     if (!runningPackages.any { it.packageName == packageName }) {
                         val isFrozen = isPackageStopped(context, packageName)
@@ -123,6 +113,18 @@ class RunningPackageHelper {
                         p1.appName.compareTo(p2.appName, ignoreCase = true) // Alphabetical for running
                     }
                 })
+        }
+
+        private fun isSystemPackage(packageName: String, myPackageName: String): Boolean {
+            if (packageName.startsWith("com.android.chrome")) {
+                return false
+            }
+            return packageName.startsWith("com.android")
+                    || packageName.startsWith("com.google.android")
+                    || packageName.startsWith("android")
+                    || packageName == myPackageName
+                    || packageName.startsWith("system:")
+                    || packageName.startsWith("com.miui")
         }
         
         fun isPackageStopped(context: Context, packageName: String): Boolean {

@@ -114,6 +114,7 @@ class RunningPackagesFragment : Fragment() {
                         android.util.Log.d("RunningPackages", "Marked $packageName as frozen in UI")
                     }
                     updateSelectActiveVisibility()
+                    updateFreezeButtonVisibility()
                 }
             }
         }
@@ -164,18 +165,38 @@ class RunningPackagesFragment : Fragment() {
 
     private fun loadRunningPackages() {
         val runningPackages = RunningPackageHelper.getRunningPackages(requireContext()).toMutableList()
-        adapter = RunningPackagesAdapter(requireContext(), runningPackages) { runningPackage ->
-            openAppInfo(runningPackage.packageName)
-        }
+        adapter = RunningPackagesAdapter(
+            requireContext(), 
+            runningPackages,
+            onKillClick = { runningPackage ->
+                runningPackage.isSelected = true
+                adapter.notifyDataSetChanged()
+                updateFreezeButtonVisibility()
+                freezeSelectedPackages()
+            },
+            onInfoClick = { runningPackage ->
+                openAppInfo(runningPackage.packageName)
+            },
+            onSelectionChanged = {
+                updateFreezeButtonVisibility()
+            }
+        )
         recyclerView.adapter = adapter
         adapter.updateFilter(tabLayout.selectedTabPosition == 1)
         updateSelectActiveVisibility()
+        updateFreezeButtonVisibility()
 
         if (isInitialLoad) {
             if (!adapter.hasActivePackages()) {
                 showNoActiveAppsDialog()
             }
             isInitialLoad = false
+        }
+    }
+
+    private fun updateFreezeButtonVisibility() {
+        if (::adapter.isInitialized) {
+            freezeButton.visibility = if (adapter.getSelectedPackages().isNotEmpty()) View.VISIBLE else View.GONE
         }
     }
 

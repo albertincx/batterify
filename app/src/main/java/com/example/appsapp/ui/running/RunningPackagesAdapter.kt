@@ -15,7 +15,9 @@ import android.content.Context
 class RunningPackagesAdapter(
     private val context: Context,
     private val allPackages: MutableList<RunningPackage>,
-    private val onKillClick: (RunningPackage) -> Unit
+    private val onKillClick: (RunningPackage) -> Unit,
+    private val onInfoClick: (RunningPackage) -> Unit,
+    private val onSelectionChanged: () -> Unit
 ) : RecyclerView.Adapter<RunningPackagesAdapter.RunningPackageViewHolder>() {
 
     private var filteredPackages: List<RunningPackage> = emptyList()
@@ -36,6 +38,7 @@ class RunningPackagesAdapter(
         val packageNameTextView: TextView = itemView.findViewById(R.id.packageNameTextView)
         val packageCheckBox: CheckBox = itemView.findViewById(R.id.packageCheckBox)
         val hideButton: Button = itemView.findViewById(R.id.hideButton)
+        val killItemButton: Button = itemView.findViewById(R.id.killItemButton)
         val actionButton: Button = itemView.findViewById(R.id.actionButton)
     }
 
@@ -63,9 +66,11 @@ class RunningPackagesAdapter(
             holder.packageCheckBox.isChecked = false
             holder.itemView.alpha = 0.5f
             holder.appNameTextView.text = "$displayAppName (Dead)"
+            holder.killItemButton.visibility = View.GONE
         } else {
             holder.packageCheckBox.isEnabled = true
             holder.itemView.alpha = 1.0f
+            holder.killItemButton.visibility = View.VISIBLE
         }
         
         // Remove listener first to avoid trigger when setting state
@@ -77,6 +82,7 @@ class RunningPackagesAdapter(
         holder.packageCheckBox.setOnCheckedChangeListener { _, isChecked ->
             if (!runningPackage.isFrozen) {
                 runningPackage.isSelected = isChecked
+                onSelectionChanged()
             }
         }
 
@@ -96,10 +102,15 @@ class RunningPackagesAdapter(
                 runningPackage.isHidden = true
             }
             updateFilter(showHiddenOnly)
+            onSelectionChanged()
         }
         
-        holder.actionButton.setOnClickListener {
+        holder.killItemButton.setOnClickListener {
             onKillClick(runningPackage)
+        }
+
+        holder.actionButton.setOnClickListener {
+            onInfoClick(runningPackage)
         }
     }
 
@@ -112,6 +123,7 @@ class RunningPackagesAdapter(
             }
         }
         notifyDataSetChanged()
+        onSelectionChanged()
     }
 
     fun selectAllActive(select: Boolean) {
@@ -121,6 +133,7 @@ class RunningPackagesAdapter(
             }
         }
         notifyDataSetChanged()
+        onSelectionChanged()
     }
 
     fun getSelectedPackages(): List<RunningPackage> {

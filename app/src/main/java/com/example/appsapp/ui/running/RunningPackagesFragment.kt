@@ -59,6 +59,7 @@ class RunningPackagesFragment : Fragment() {
 
         refreshButton.setOnClickListener {
             loadRunningPackages()
+            selectActiveCheckBox.isChecked = false
         }
 
         freezeButton.setOnClickListener {

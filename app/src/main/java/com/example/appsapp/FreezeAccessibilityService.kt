@@ -4,8 +4,10 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -44,9 +46,6 @@ class FreezeAccessibilityService : AccessibilityService() {
 
             if (currentPackage != null) {
                 if (currentPackage == context.packageName) {
-//                    mainHandler.postDelayed({
-//                        processNext(context)
-//                    }, 400)
                     Log.d(TAG, "")
                     Log.d(TAG, "SKIP: $currentPackage")
                     processNext(context)
@@ -121,7 +120,7 @@ class FreezeAccessibilityService : AccessibilityService() {
         }
 
         mainHandler.removeCallbacksAndMessages("retry_all")
-        mainHandler.postDelayed({
+        mainHandler.postDelayedCompat({
             if (isProcessing) {
                 for (w in windows) {
                     val r = w.root ?: continue
@@ -131,7 +130,7 @@ class FreezeAccessibilityService : AccessibilityService() {
                     }
                 }
             }
-        }, "retry_all", 1000)
+        }, 600, "retry_all")
     }
 
     private fun handleDialog(root: AccessibilityNodeInfo): Boolean {
@@ -141,7 +140,6 @@ class FreezeAccessibilityService : AccessibilityService() {
         // 2. Search for clickable nodes matching text
         val clickableNode = recursiveSearchClickable(root, dialogTexts)
         if (clickableNode != null) {
-            Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.uniqueId}")
             Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.windowId}")
             Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.text}")
             Log.d(TAG, "TRY CLICK")
@@ -153,7 +151,6 @@ class FreezeAccessibilityService : AccessibilityService() {
                 Log.d(TAG, "Found clickable dialog button via is: ${nodeText == "OK"}")
                 if (nodeText == "OK") {
                     // close current intent
-//                    performGlobalAction(GLOBAL_ACTION_BACK)
                     goBackAndContinue()
                 }
                 return true
@@ -200,9 +197,7 @@ class FreezeAccessibilityService : AccessibilityService() {
                         Log.d(TAG, "Main button disabled, skipping $currentPackage")
                         currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                         isWaitingForNext = true
-                        mainHandler.postDelayed({
-                            goBackAndContinue()
-                        }, 2000)
+                        goBackAndContinue()
                         return true
                     }
                 }
@@ -223,9 +218,7 @@ class FreezeAccessibilityService : AccessibilityService() {
                     Log.d(TAG, "Main button (Text) disabled, skipping $currentPackage")
                     currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                     isWaitingForNext = true
-                    mainHandler.postDelayed({
-                        goBackAndContinue()
-                    }, 2000)
+                    goBackAndContinue()
                     return true
                 }
             }
@@ -307,14 +300,24 @@ class FreezeAccessibilityService : AccessibilityService() {
     }
 
     private fun goBackAndContinue() {
-        mainHandler.postDelayed({
+        mainHandler.postDelayedCompat({
             performGlobalAction(GLOBAL_ACTION_BACK)
             returnToMainApp(this)
-            mainHandler.postDelayed({
+            mainHandler.postDelayedCompat({
                 processNext(this)
             }, 400)
         }, 300)
     }
 
     override fun onInterrupt() {}
+}
+
+fun Handler.postDelayedCompat(runnable: Runnable, delayMillis: Long, token: Any? = "") {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        postDelayed(runnable, token, delayMillis)
+    } else {
+        val message = Message.obtain(this, runnable)
+        message.obj = token
+        sendMessageDelayed(message, delayMillis)
+    }
 }

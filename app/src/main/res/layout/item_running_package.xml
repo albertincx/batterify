@@ -34,7 +34,7 @@
                 android:id="@+id/packageNameTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#666666"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp" />
         </LinearLayout>
 
@@ -51,6 +51,6 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="8dp"
-        android:background="#EEEEEE" />
+        android:background="?attr/colorOutlineVariant" />
 
 </LinearLayout>

@@ -12,6 +12,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
 import java.util.concurrent.LinkedBlockingQueue
 
 class FreezeAccessibilityService : AccessibilityService() {
@@ -26,12 +27,14 @@ class FreezeAccessibilityService : AccessibilityService() {
         private var lastActionTime = 0L
         private val mainHandler = Handler(Looper.getMainLooper())
         private var instance: FreezeAccessibilityService? = null
+        private var isSelfFreezing = false
 
         fun startFreezing(context: Context, packageNames: List<String>) {
             val filtered = packageNames.filter { it != context.packageName }
             packageQueue.clear()
             packageQueue.addAll(filtered)
             isProcessing = true
+            isSelfFreezing = false
             mainButtonClicked = false
             Log.d(TAG, "")
             Log.d(TAG, "")
@@ -71,16 +74,28 @@ class FreezeAccessibilityService : AccessibilityService() {
                 
                 val sharedPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 val turnOffScreen = sharedPref.getBoolean("turn_off_screen", false)
-                returnToMainApp(context, turnOffScreen)
+                
+                if (turnOffScreen) {
+                    isSelfFreezing = true
+                    isProcessing = true // Need to process self-freeze
+                    Toast.makeText(context, R.string.status_closing_apps_turning_off, Toast.LENGTH_SHORT).show()
+                    
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                        addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+                    }
+                    context.startActivity(intent)
+                } else {
+                    returnToMainApp(context)
+                }
             }
         }
 
-        private fun returnToMainApp(context: Context, showLockDialog: Boolean = false) {
+        private fun returnToMainApp(context: Context) {
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             intent?.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            if (showLockDialog) {
-                intent?.putExtra("show_lock_dialog", true)
-            }
             intent?.let { context.startActivity(it) }
         }
 
@@ -88,6 +103,7 @@ class FreezeAccessibilityService : AccessibilityService() {
             Log.d(TAG, "Automation stopped by user or interruption.")
             packageQueue.clear()
             isProcessing = false
+            isSelfFreezing = false
             currentPackage = null
         }
 
@@ -168,7 +184,11 @@ class FreezeAccessibilityService : AccessibilityService() {
             Log.d(TAG, "TRY CLICK")
             if (performAggressiveClick(clickableNode)) {
                 Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
-                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+                if (isSelfFreezing) {
+                    lockScreen()
+                } else {
+                    currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
+                }
                 isWaitingForNext = true
                 val nodeText = clickableNode.text?.toString()?.uppercase() ?: ""
                 Log.d(TAG, "Found clickable dialog button via is: ${nodeText == "OK"}")

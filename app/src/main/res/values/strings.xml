@@ -6,4 +6,8 @@
     <string name="accessibility_service_description">Automate stopping applications (Force Stop) to save energy.</string>
     <string name="settings_turn_off_screen">Turn off the screen after closing apps</string>
     <string name="status_closing_apps_turning_off">Closing apps and turn off the screen</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System Default</string>
 </resources>

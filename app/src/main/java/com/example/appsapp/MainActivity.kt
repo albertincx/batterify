@@ -4,12 +4,12 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Toast
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import com.example.appsapp.databinding.ActivityMainBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -39,21 +39,6 @@ class MainActivity : AppCompatActivity() {
             )
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
-
-        checkLockDialog(intent)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        checkLockDialog(intent)
-    }
-
-    private fun checkLockDialog(intent: Intent?) {
-        if (intent?.getBooleanExtra("show_lock_dialog", false) == true) {
-            Toast.makeText(this, R.string.status_closing_apps_turning_off, Toast.LENGTH_SHORT).show()
-            FreezeAccessibilityService.lockScreen()
-            finish()
-        }
     }
 
     private fun isFirstLaunch(): Boolean {
@@ -110,19 +95,68 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSettingsDialog() {
+        val options = arrayOf(
+            getString(R.string.settings_turn_off_screen),
+            getString(R.string.settings_theme)
+        )
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.action_settings)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showTurnOffScreenSetting()
+                    1 -> showThemeSelectionDialog()
+                }
+            }
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun showTurnOffScreenSetting() {
         val sharedPref = getSharedPreferences("settings", MODE_PRIVATE)
         val currentSetting = sharedPref.getBoolean("turn_off_screen", false)
         val options = arrayOf(getString(R.string.settings_turn_off_screen))
         val checkedItems = booleanArrayOf(currentSetting)
 
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.action_settings)
+            .setTitle(R.string.settings_turn_off_screen)
             .setMultiChoiceItems(options, checkedItems) { _, which, isChecked ->
                 if (which == 0) {
                     sharedPref.edit().putBoolean("turn_off_screen", isChecked).apply()
                 }
             }
             .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun showThemeSelectionDialog() {
+        val sharedPref = getSharedPreferences("settings", MODE_PRIVATE)
+        val currentTheme = sharedPref.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        
+        val themes = arrayOf(
+            getString(R.string.theme_light),
+            getString(R.string.theme_dark),
+            getString(R.string.theme_system)
+        )
+        
+        val themeModes = intArrayOf(
+            AppCompatDelegate.MODE_NIGHT_NO,
+            AppCompatDelegate.MODE_NIGHT_YES,
+            AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        )
+        
+        var checkedItem = themeModes.indexOf(currentTheme)
+        if (checkedItem == -1) checkedItem = 2 // Default to system
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.settings_theme)
+            .setSingleChoiceItems(themes, checkedItem) { dialog, which ->
+                val selectedMode = themeModes[which]
+                sharedPref.edit().putInt("theme_mode", selectedMode).apply()
+                AppCompatDelegate.setDefaultNightMode(selectedMode)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 

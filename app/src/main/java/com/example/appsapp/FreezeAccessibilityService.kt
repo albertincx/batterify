@@ -25,6 +25,7 @@ class FreezeAccessibilityService : AccessibilityService() {
         private var isWaitingForNext = false
         private var lastActionTime = 0L
         private val mainHandler = Handler(Looper.getMainLooper())
+        private var instance: FreezeAccessibilityService? = null
 
         fun startFreezing(context: Context, packageNames: List<String>) {
             val filtered = packageNames.filter { it != context.packageName }
@@ -67,13 +68,19 @@ class FreezeAccessibilityService : AccessibilityService() {
                 Log.d(TAG, "")
                 Log.d(TAG, "")
                 Log.d(TAG, "Queue empty, finished.")
-                returnToMainApp(context)
+                
+                val sharedPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                val turnOffScreen = sharedPref.getBoolean("turn_off_screen", false)
+                returnToMainApp(context, turnOffScreen)
             }
         }
 
-        private fun returnToMainApp(context: Context) {
+        private fun returnToMainApp(context: Context, showLockDialog: Boolean = false) {
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             intent?.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            if (showLockDialog) {
+                intent?.putExtra("show_lock_dialog", true)
+            }
             intent?.let { context.startActivity(it) }
         }
 
@@ -83,6 +90,22 @@ class FreezeAccessibilityService : AccessibilityService() {
             isProcessing = false
             currentPackage = null
         }
+
+        fun lockScreen() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+            }
+        }
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.Toast
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
@@ -38,6 +39,21 @@ class MainActivity : AppCompatActivity() {
             )
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
+
+        checkLockDialog(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        checkLockDialog(intent)
+    }
+
+    private fun checkLockDialog(intent: Intent?) {
+        if (intent?.getBooleanExtra("show_lock_dialog", false) == true) {
+            Toast.makeText(this, R.string.status_closing_apps_turning_off, Toast.LENGTH_SHORT).show()
+            FreezeAccessibilityService.lockScreen()
+            finish()
+        }
     }
 
     private fun isFirstLaunch(): Boolean {
@@ -81,12 +97,33 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_settings -> {
+                showSettingsDialog()
+                true
+            }
             R.id.action_policy -> {
                 startActivity(Intent(this, PolicyActivity::class.java))
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    private fun showSettingsDialog() {
+        val sharedPref = getSharedPreferences("settings", MODE_PRIVATE)
+        val currentSetting = sharedPref.getBoolean("turn_off_screen", false)
+        val options = arrayOf(getString(R.string.settings_turn_off_screen))
+        val checkedItems = booleanArrayOf(currentSetting)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.action_settings)
+            .setMultiChoiceItems(options, checkedItems) { _, which, isChecked ->
+                if (which == 0) {
+                    sharedPref.edit().putBoolean("turn_off_screen", isChecked).apply()
+                }
+            }
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     override fun onSupportNavigateUp(): Boolean {

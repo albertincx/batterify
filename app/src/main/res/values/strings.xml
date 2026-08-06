@@ -2,6 +2,8 @@
     <string name="app_name">Batterify</string>
     <string name="action_settings">Settings</string>
 
-    <string name="menu_running_packages">Running Packages</string>
-    <string name="accessibility_service_description">Автоматизация остановки приложений (Force Stop) для экономии энергии.</string>
+    <string name="menu_running_packages">Running Apps</string>
+    <string name="accessibility_service_description">Automate stopping applications (Force Stop) to save energy.</string>
+    <string name="settings_turn_off_screen">Turn off the screen after closing apps</string>
+    <string name="status_closing_apps_turning_off">Closing apps and turn off the screen</string>
 </resources>

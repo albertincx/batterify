@@ -173,7 +173,7 @@ class RunningPackagesFragment : Fragment() {
                 runningPackage.isSelected = true
                 adapter.notifyDataSetChanged()
                 updateFreezeButtonVisibility()
-                freezeSelectedPackages()
+                freezeSelectedPackages(true)
             },
             onInfoClick = { runningPackage ->
                 openAppInfo(runningPackage.packageName)
@@ -215,7 +215,7 @@ class RunningPackagesFragment : Fragment() {
             .show()
     }
 
-    private fun freezeSelectedPackages() {
+    private fun freezeSelectedPackages(isMenuFreeze: Boolean = false) {
         if (!isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)) {
             Toast.makeText(context, "Please enable Accessibility Service first", Toast.LENGTH_LONG).show()
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -231,9 +231,9 @@ class RunningPackagesFragment : Fragment() {
 
         // Use the new sequential freezing logic
         val packageNames = selected.map { it.packageName }
-        FreezeAccessibilityService.startFreezing(requireContext(), packageNames)
+        FreezeAccessibilityService.startFreezing(requireContext(), packageNames, isMenuFreeze)
         
-        Toast.makeText(context, "Freezing ${selected.size} apps...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Stopping ${selected.size} apps...", Toast.LENGTH_SHORT).show()
     }
 
     private fun openAppInfo(packageName: String) {

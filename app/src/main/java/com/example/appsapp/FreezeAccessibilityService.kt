@@ -21,6 +21,7 @@ class FreezeAccessibilityService : AccessibilityService() {
         private const val TAG = "FreezeService"
         private val packageQueue = LinkedBlockingQueue<String>()
         private var isProcessing = false
+        private var isMenuFreeze = false
         private var currentPackage: String? = null
         private var mainButtonClicked = false
         private var isWaitingForNext = false
@@ -29,7 +30,7 @@ class FreezeAccessibilityService : AccessibilityService() {
         private var instance: FreezeAccessibilityService? = null
         private var isSelfFreezing = false
 
-        fun startFreezing(context: Context, packageNames: List<String>) {
+        fun startFreezing(context: Context, packageNames: List<String>, isMenuFreeze1: Boolean = false) {
             val filtered = packageNames.filter { it != context.packageName }
             packageQueue.clear()
             packageQueue.addAll(filtered)
@@ -39,6 +40,7 @@ class FreezeAccessibilityService : AccessibilityService() {
             Log.d(TAG, "")
             Log.d(TAG, "")
             Log.d(TAG, "CALL1: $isProcessing")
+            isMenuFreeze = isMenuFreeze1
             processNext(context)
         }
 
@@ -75,7 +77,7 @@ class FreezeAccessibilityService : AccessibilityService() {
                 val sharedPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 val turnOffScreen = sharedPref.getBoolean("turn_off_screen", false)
                 
-                if (turnOffScreen) {
+                if (turnOffScreen && isMenuFreeze == false) {
                     isSelfFreezing = true
                     isProcessing = true // Need to process self-freeze
                     Toast.makeText(context, R.string.status_closing_apps_turning_off, Toast.LENGTH_SHORT).show()

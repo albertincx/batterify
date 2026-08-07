@@ -30,7 +30,11 @@ class FreezeAccessibilityService : AccessibilityService() {
         private var instance: FreezeAccessibilityService? = null
         private var isSelfFreezing = false
 
-        fun startFreezing(context: Context, packageNames: List<String>, isMenuFreeze1: Boolean = false) {
+        fun startFreezing(
+            context: Context,
+            packageNames: List<String>,
+            isMenuFreeze1: Boolean = false
+        ) {
             val filtered = packageNames.filter { it != context.packageName }
             packageQueue.clear()
             packageQueue.addAll(filtered)
@@ -73,22 +77,21 @@ class FreezeAccessibilityService : AccessibilityService() {
                 Log.d(TAG, "")
                 Log.d(TAG, "")
                 Log.d(TAG, "Queue empty, finished.")
-                
+
                 val sharedPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 val turnOffScreen = sharedPref.getBoolean("turn_off_screen", false)
-                
+
                 if (turnOffScreen && isMenuFreeze == false) {
                     isSelfFreezing = true
                     isProcessing = true // Need to process self-freeze
-                    Toast.makeText(context, R.string.status_closing_apps_turning_off, Toast.LENGTH_SHORT).show()
-                    
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
-                        addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
-                    }
-                    context.startActivity(intent)
+                    Toast.makeText(
+                        context,
+                        R.string.status_closing_apps_turning_off,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    mainHandler.postDelayedCompat({
+                        lockScreen()
+                    }, 700)
                 } else {
                     returnToMainApp(context)
                 }
@@ -184,15 +187,17 @@ class FreezeAccessibilityService : AccessibilityService() {
             Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.windowId}")
             Log.d(TAG, "Found clickable dialog button via text: ${clickableNode.text}")
             Log.d(TAG, "TRY CLICK")
+            val nodeText = clickableNode.text?.toString()?.uppercase() ?: ""
+
             if (performAggressiveClick(clickableNode)) {
+//                if (isSelfFreezing && nodeText == "OK") {
+//                    lockScreen()
+//                    return true
+//                }
                 Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
-                if (isSelfFreezing) {
-                    lockScreen()
-                } else {
-                    currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
-                }
+                currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                 isWaitingForNext = true
-                val nodeText = clickableNode.text?.toString()?.uppercase() ?: ""
+
                 Log.d(TAG, "Found clickable dialog button via is: ${nodeText == "OK"}")
                 if (nodeText == "OK") {
                     // close current intent

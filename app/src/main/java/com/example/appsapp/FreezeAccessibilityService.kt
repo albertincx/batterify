@@ -28,7 +28,6 @@ class FreezeAccessibilityService : AccessibilityService() {
         private var lastActionTime = 0L
         private val mainHandler = Handler(Looper.getMainLooper())
         private var instance: FreezeAccessibilityService? = null
-        private var isSelfFreezing = false
 
         fun startFreezing(
             context: Context,
@@ -39,7 +38,6 @@ class FreezeAccessibilityService : AccessibilityService() {
             packageQueue.clear()
             packageQueue.addAll(filtered)
             isProcessing = true
-            isSelfFreezing = false
             mainButtonClicked = false
             Log.d(TAG, "")
             Log.d(TAG, "")
@@ -73,28 +71,21 @@ class FreezeAccessibilityService : AccessibilityService() {
                 context.startActivity(intent)
 //                intent.let { context.startActivity(it) }
             } else {
-                isProcessing = false
-                Log.d(TAG, "")
-                Log.d(TAG, "")
                 Log.d(TAG, "Queue empty, finished.")
 
                 val sharedPref = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 val turnOffScreen = sharedPref.getBoolean("turn_off_screen", false)
 
-                if (turnOffScreen && isMenuFreeze == false) {
-                    isSelfFreezing = true
-                    isProcessing = true // Need to process self-freeze
+                if (turnOffScreen && !isMenuFreeze) {
                     Toast.makeText(
                         context,
                         R.string.status_closing_apps_turning_off,
                         Toast.LENGTH_SHORT
                     ).show()
-                    mainHandler.postDelayedCompat({
-                        lockScreen()
-                    }, 700)
-                } else {
-                    returnToMainApp(context)
+                    lockScreen()
                 }
+                stopAutomation()
+                returnToMainApp(context)
             }
         }
 
@@ -105,11 +96,14 @@ class FreezeAccessibilityService : AccessibilityService() {
         }
 
         fun stopAutomation() {
-            Log.d(TAG, "Automation stopped by user or interruption.")
+            Log.d(TAG, "Automation stopped.")
             packageQueue.clear()
             isProcessing = false
-            isSelfFreezing = false
+            isMenuFreeze = false
             currentPackage = null
+            mainButtonClicked = false
+            isWaitingForNext = false
+            mainHandler.removeCallbacksAndMessages("retry_all")
         }
 
         fun lockScreen() {
@@ -190,10 +184,6 @@ class FreezeAccessibilityService : AccessibilityService() {
             val nodeText = clickableNode.text?.toString()?.uppercase() ?: ""
 
             if (performAggressiveClick(clickableNode)) {
-//                if (isSelfFreezing && nodeText == "OK") {
-//                    lockScreen()
-//                    return true
-//                }
                 Log.d(TAG, "Confirmed dialog via text match for $currentPackage")
                 currentPackage?.let { FreezeStatusObserver.notifyPackageFrozen(it) }
                 isWaitingForNext = true

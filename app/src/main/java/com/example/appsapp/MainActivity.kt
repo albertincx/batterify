@@ -97,7 +97,10 @@ class MainActivity : AppCompatActivity() {
     private fun showSettingsDialog() {
         val options = arrayOf(
             getString(R.string.settings_turn_off_screen),
-            getString(R.string.settings_theme)
+            getString(R.string.settings_theme),
+            getString(R.string.settings_last_action_time),
+            getString(R.string.settings_return_time),
+            getString(R.string.settings_next_time)
         )
 
         MaterialAlertDialogBuilder(this)
@@ -106,9 +109,27 @@ class MainActivity : AppCompatActivity() {
                 when (which) {
                     0 -> showTurnOffScreenSetting()
                     1 -> showThemeSelectionDialog()
+                    2 -> showNumericSettingDialog(R.string.settings_last_action_time, "last_action_time", 500, arrayOf("100", "200", "300", "400", "500"))
+                    3 -> showNumericSettingDialog(R.string.settings_return_time, "return_time", 300, arrayOf("100", "150", "200", "250", "300"))
+                    4 -> showNumericSettingDialog(R.string.settings_next_time, "next_time", 400, arrayOf("100", "200", "300", "400"))
                 }
             }
             .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun showNumericSettingDialog(titleRes: Int, key: String, defaultValue: Int, options: Array<String>) {
+        val sharedPref = getSharedPreferences("settings", MODE_PRIVATE)
+        val currentValue = sharedPref.getInt(key, defaultValue)
+        val currentIndex = options.indexOf(currentValue.toString()).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(titleRes)
+            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                sharedPref.edit().putInt(key, options[which].toInt()).apply()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 

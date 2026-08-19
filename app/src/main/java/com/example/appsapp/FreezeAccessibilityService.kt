@@ -139,8 +139,11 @@ class FreezeAccessibilityService : AccessibilityService() {
             event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         ) return
 
+        val sharedPref = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val lastActionDelay = sharedPref.getInt("last_action_time", 500).toLong()
+
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastActionTime < 500) return
+        if (currentTime - lastActionTime < lastActionDelay) return
 
         val allWindows = windows
         for (window in allWindows) {
@@ -340,13 +343,17 @@ class FreezeAccessibilityService : AccessibilityService() {
     }
 
     private fun goBackAndContinue() {
+        val sharedPref = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val returnTime = sharedPref.getInt("return_time", 300).toLong()
+        val nextTime = sharedPref.getInt("next_time", 400).toLong()
+
         mainHandler.postDelayedCompat({
             performGlobalAction(GLOBAL_ACTION_BACK)
             returnToMainApp(this)
             mainHandler.postDelayedCompat({
                 processNext(this)
-            }, 400)
-        }, 300)
+            }, nextTime)
+        }, returnTime)
     }
 
     override fun onInterrupt() {}

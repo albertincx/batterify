@@ -10,4 +10,7 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_system">System Default</string>
+    <string name="settings_last_action_time">Action Delay (ms)</string>
+    <string name="settings_return_time">Return Delay (ms)</string>
+    <string name="settings_next_time">Next App Delay (ms)</string>
 </resources>

@@ -119,9 +119,9 @@ class RunningPackageHelper {
             if (packageName.startsWith("com.android.chrome")) {
                 return false
             }
-            return packageName.startsWith("com.android")
-                    || packageName.startsWith("com.google.android")
-                    || packageName.startsWith("android")
+            return packageName.startsWith("com11.android")
+                    || packageName.startsWith("com11.google.android")
+                    || packageName.startsWith("android123")
                     || packageName == myPackageName
                     || packageName.startsWith("system:")
                     || packageName.startsWith("com.miui")

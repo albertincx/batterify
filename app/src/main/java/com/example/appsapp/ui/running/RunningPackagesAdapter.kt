@@ -12,6 +12,11 @@ import com.example.appsapp.RunningPackageHelper
 import android.content.Context
 import android.widget.ImageButton
 import androidx.appcompat.widget.PopupMenu
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.widget.Toast
+import com.example.appsapp.HistoryHelper
+import com.example.appsapp.HistoryItem
 
 class RunningPackagesAdapter(
     private val context: Context,
@@ -21,16 +26,21 @@ class RunningPackagesAdapter(
     private val onSelectionChanged: () -> Unit
 ) : RecyclerView.Adapter<RunningPackagesAdapter.RunningPackageViewHolder>() {
 
-    private var filteredPackages: List<RunningPackage> = emptyList()
-    private var showHiddenOnly: Boolean = false
+    private var filteredPackages: List<Any> = emptyList()
+    private var currentMode: Int = 0 // 0: All, 1: Hidden, 2: History
 
     init {
-        updateFilter(false)
+        updateFilter(0)
     }
 
-    fun updateFilter(showHidden: Boolean) {
-        showHiddenOnly = showHidden
-        filteredPackages = allPackages.filter { it.isHidden == showHiddenOnly }
+    fun updateFilter(mode: Int) {
+        currentMode = mode
+        filteredPackages = when (mode) {
+            0 -> allPackages.filter { !it.isHidden }
+            1 -> allPackages.filter { it.isHidden }
+            2 -> HistoryHelper.getHistory(context)
+            else -> emptyList()
+        }
         notifyDataSetChanged()
     }
 
@@ -48,10 +58,19 @@ class RunningPackagesAdapter(
     }
 
     override fun onBindViewHolder(holder: RunningPackageViewHolder, position: Int) {
-        val runningPackage = filteredPackages[position]
+        val item = filteredPackages[position]
         
+        if (item is RunningPackage) {
+            bindRunningPackage(holder, item)
+        } else if (item is HistoryItem) {
+            bindHistoryItem(holder, item)
+        }
+    }
+
+    private fun bindRunningPackage(holder: RunningPackageViewHolder, runningPackage: RunningPackage) {
         // Remove listener first to avoid trigger when setting state
         holder.packageCheckBox.setOnCheckedChangeListener(null)
+        holder.packageCheckBox.visibility = View.VISIBLE
 
         val displayAppName = if (runningPackage.appName.length > 50) {
             runningPackage.appName.substring(0, 30) + "..."
@@ -95,6 +114,18 @@ class RunningPackagesAdapter(
         }
     }
 
+    private fun bindHistoryItem(holder: RunningPackageViewHolder, historyItem: HistoryItem) {
+        holder.packageCheckBox.visibility = View.GONE
+        holder.appNameTextView.text = historyItem.appName
+        holder.packageNameTextView.text = historyItem.packageName
+        holder.itemView.alpha = 1.0f
+        holder.itemView.setOnClickListener(null)
+        
+        holder.menuButton.setOnClickListener { view ->
+            showHistoryPopupMenu(view, historyItem)
+        }
+    }
+
     private fun showPopupMenu(view: View, runningPackage: RunningPackage) {
         val popup = PopupMenu(context, view)
         
@@ -107,6 +138,7 @@ class RunningPackagesAdapter(
         }
         
         popup.menu.add(0, 3, 2, "Info")
+        popup.menu.add(0, 4, 3, "Copy Package")
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -118,7 +150,7 @@ class RunningPackagesAdapter(
                         RunningPackageHelper.hidePackage(context, runningPackage.packageName)
                         runningPackage.isHidden = true
                     }
-                    updateFilter(showHiddenOnly)
+                    updateFilter(currentMode)
                     onSelectionChanged()
                     true
                 }
@@ -130,17 +162,50 @@ class RunningPackagesAdapter(
                     onInfoClick(runningPackage)
                     true
                 }
+                4 -> { // Copy Package
+                    copyToClipboard(runningPackage.packageName)
+                    true
+                }
                 else -> false
             }
         }
         popup.show()
     }
 
+    private fun showHistoryPopupMenu(view: View, historyItem: HistoryItem) {
+        val popup = PopupMenu(context, view)
+        popup.menu.add(0, 1, 0, "Copy Package")
+        popup.menu.add(0, 2, 1, "Info")
+
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> {
+                    copyToClipboard(historyItem.packageName)
+                    true
+                }
+                2 -> {
+                    val rp = RunningPackage(historyItem.packageName, historyItem.packageName, 0, historyItem.appName)
+                    onInfoClick(rp)
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    private fun copyToClipboard(text: String) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("package name", text)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, "Copied: $text", Toast.LENGTH_SHORT).show()
+    }
+
     override fun getItemCount(): Int = filteredPackages.size
     
     fun selectAll(select: Boolean) {
         filteredPackages.forEach { 
-            if (!it.isFrozen) {
+            if (it is RunningPackage && !it.isFrozen) {
                 it.isSelected = select 
             }
         }
@@ -150,7 +215,7 @@ class RunningPackagesAdapter(
 
     fun selectAllActive(select: Boolean) {
         filteredPackages.forEach { 
-            if (!it.isFrozen && !it.isHidden) {
+            if (it is RunningPackage && !it.isFrozen && !it.isHidden) {
                 it.isSelected = select 
             }
         }
@@ -169,9 +234,12 @@ class RunningPackagesAdapter(
     fun updatePackageFrozen(packageName: String): Int {
         val index = allPackages.indexOfFirst { it.packageName == packageName }
         if (index != -1) {
-            allPackages[index].isFrozen = true
-            allPackages[index].isSelected = false
-            allPackages[index].frozenTimestamp = System.currentTimeMillis()
+            val pkg = allPackages[index]
+            pkg.isFrozen = true
+            pkg.isSelected = false
+            pkg.frozenTimestamp = System.currentTimeMillis()
+            
+            HistoryHelper.addHistory(context, pkg.appName, pkg.packageName)
             
             // Re-sort the master list
             allPackages.sortWith(Comparator { p1, p2 ->
@@ -183,7 +251,7 @@ class RunningPackagesAdapter(
                     p1.appName.compareTo(p2.appName, ignoreCase = true)
                 }
             })
-            updateFilter(showHiddenOnly)
+            updateFilter(currentMode)
         }
         return index
     }

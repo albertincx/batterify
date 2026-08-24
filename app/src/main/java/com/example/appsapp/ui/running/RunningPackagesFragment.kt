@@ -91,8 +91,14 @@ class RunningPackagesFragment : Fragment() {
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 if (::adapter.isInitialized) {
-                    adapter.updateFilter(tab?.position == 1)
+                    val position = tab?.position ?: 0
+                    adapter.updateFilter(position)
                     updateSelectActiveVisibility()
+                    
+                    // Hide controls for history tab
+                    val controlsVisibility = if (position == 2) View.GONE else View.VISIBLE
+                    root.findViewById<View>(R.id.controls_layout).visibility = controlsVisibility
+                    root.findViewById<View>(R.id.bottom_buttons).visibility = controlsVisibility
                 }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
@@ -183,7 +189,7 @@ class RunningPackagesFragment : Fragment() {
             }
         )
         recyclerView.adapter = adapter
-        adapter.updateFilter(tabLayout.selectedTabPosition == 1)
+        adapter.updateFilter(tabLayout.selectedTabPosition)
         updateSelectActiveVisibility()
         updateFreezeButtonVisibility()
 

@@ -192,5 +192,37 @@ class RunningPackageHelper {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putStringSet(HIDDEN_PACKAGES_KEY, packages).apply()
         }
+
+        fun getAllUserPackages(context: Context): List<RunningPackage> {
+            val packageManager = context.packageManager
+            val installedPackages = packageManager.getInstalledPackages(0)
+            val userPackages = mutableListOf<RunningPackage>()
+            val hiddenPackages = getHiddenPackages(context)
+
+            installedPackages.forEach { packageInfo ->
+                val ai = packageInfo.applicationInfo ?: return@forEach
+                // Filter out system apps that haven't been updated
+                val isSystem = (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                val isUpdatedSystem = (ai.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+
+                if ((!isSystem || isUpdatedSystem) && packageInfo.packageName != context.packageName) {
+                    val isFrozen = isPackageStopped(context, packageInfo.packageName)
+                    userPackages.add(
+                        RunningPackage(
+                            packageName = packageInfo.packageName,
+                            processName = packageInfo.packageName,
+                            processId = -1,
+                            appName = ai.loadLabel(packageManager).toString(),
+                            isVisible = true,
+                            isFrozen = isFrozen,
+                            frozenTimestamp = if (isFrozen) 1L else 0L,
+                            isHidden = hiddenPackages.contains(packageInfo.packageName)
+                        )
+                    )
+                }
+            }
+
+            return userPackages.sortedBy { it.appName.lowercase() }
+        }
     }
 }

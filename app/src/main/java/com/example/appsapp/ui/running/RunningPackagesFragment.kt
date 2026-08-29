@@ -95,10 +95,17 @@ class RunningPackagesFragment : Fragment() {
                     adapter.updateFilter(position)
                     updateSelectActiveVisibility()
                     
-                    // Hide controls for history tab
-                    val controlsVisibility = if (position == 2) View.GONE else View.VISIBLE
-                    root.findViewById<View>(R.id.controls_layout).visibility = controlsVisibility
-                    root.findViewById<View>(R.id.bottom_buttons).visibility = controlsVisibility
+                    // Specific logic for History vs Others
+                    if (position == 2) { // History
+                        root.findViewById<View>(R.id.controls_layout).visibility = View.GONE
+                        root.findViewById<View>(R.id.bottom_buttons).visibility = View.GONE
+                    } else {
+                        root.findViewById<View>(R.id.controls_layout).visibility = View.VISIBLE
+                        root.findViewById<View>(R.id.bottom_buttons).visibility = View.VISIBLE
+                        if (position == 3) { // Installed
+                            loadAllUserPackages()
+                        }
+                    }
                 }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
@@ -192,12 +199,25 @@ class RunningPackagesFragment : Fragment() {
         adapter.updateFilter(tabLayout.selectedTabPosition)
         updateSelectActiveVisibility()
         updateFreezeButtonVisibility()
+        
+        if (tabLayout.selectedTabPosition == 3) {
+            loadAllUserPackages()
+        }
 
         if (isInitialLoad) {
             if (!adapter.hasActivePackages()) {
                 showNoActiveAppsDialog()
             }
             isInitialLoad = false
+        }
+    }
+
+    private fun loadAllUserPackages() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val userPackages = RunningPackageHelper.getAllUserPackages(requireContext())
+            if (::adapter.isInitialized) {
+                adapter.setUserPackages(userPackages)
+            }
         }
     }
 

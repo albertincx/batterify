@@ -21,16 +21,24 @@ import com.example.appsapp.HistoryItem
 class RunningPackagesAdapter(
     private val context: Context,
     private val allPackages: MutableList<RunningPackage>,
+    private var allUserPackages: List<RunningPackage> = emptyList(),
     private val onKillClick: (RunningPackage) -> Unit,
     private val onInfoClick: (RunningPackage) -> Unit,
     private val onSelectionChanged: () -> Unit
 ) : RecyclerView.Adapter<RunningPackagesAdapter.RunningPackageViewHolder>() {
 
     private var filteredPackages: List<Any> = emptyList()
-    private var currentMode: Int = 0 // 0: All, 1: Hidden, 2: History
+    private var currentMode: Int = 0 // 0: All, 1: Hidden, 2: History, 3: Installed
 
     init {
         updateFilter(0)
+    }
+
+    fun setUserPackages(packages: List<RunningPackage>) {
+        allUserPackages = packages
+        if (currentMode == 3) {
+            updateFilter(3)
+        }
     }
 
     fun updateFilter(mode: Int) {
@@ -39,6 +47,7 @@ class RunningPackagesAdapter(
             0 -> allPackages.filter { !it.isHidden }
             1 -> allPackages.filter { it.isHidden }
             2 -> HistoryHelper.getHistory(context)
+            3 -> allUserPackages
             else -> emptyList()
         }
         notifyDataSetChanged()
@@ -224,35 +233,53 @@ class RunningPackagesAdapter(
     }
 
     fun getSelectedPackages(): List<RunningPackage> {
-        return allPackages.filter { it.isSelected && !it.isFrozen }
+        val selected = mutableListOf<RunningPackage>()
+        allPackages.filter { it.isSelected && !it.isFrozen }.forEach { selected.add(it) }
+        allUserPackages.filter { it.isSelected && !it.isFrozen }.forEach { pkg ->
+            if (selected.none { it.packageName == pkg.packageName }) {
+                selected.add(pkg)
+            }
+        }
+        return selected
     }
 
     fun hasActivePackages(): Boolean {
-        return allPackages.any { !it.isFrozen && !it.isHidden }
+        return when (currentMode) {
+            0 -> allPackages.any { !it.isFrozen && !it.isHidden }
+            1 -> allPackages.any { !it.isFrozen && it.isHidden }
+            3 -> allUserPackages.any { !it.isFrozen }
+            else -> false
+        }
     }
 
     fun updatePackageFrozen(packageName: String): Int {
-        val index = allPackages.indexOfFirst { it.packageName == packageName }
-        if (index != -1) {
-            val pkg = allPackages[index]
+        // Update in master list
+        allPackages.find { it.packageName == packageName }?.let { pkg ->
             pkg.isFrozen = true
             pkg.isSelected = false
             pkg.frozenTimestamp = System.currentTimeMillis()
-            
             HistoryHelper.addHistory(context, pkg.appName, pkg.packageName)
-            
-            // Re-sort the master list
-            allPackages.sortWith(Comparator { p1, p2 ->
-                if (p1.isFrozen != p2.isFrozen) {
-                    p1.isFrozen.compareTo(p2.isFrozen)
-                } else if (p1.isFrozen) {
-                    p2.frozenTimestamp.compareTo(p1.frozenTimestamp) // Recently frozen first
-                } else {
-                    p1.appName.compareTo(p2.appName, ignoreCase = true)
-                }
-            })
-            updateFilter(currentMode)
         }
-        return index
+
+        // Update in user apps list
+        allUserPackages.find { it.packageName == packageName }?.let { pkg ->
+            pkg.isFrozen = true
+            pkg.isSelected = false
+            pkg.frozenTimestamp = System.currentTimeMillis()
+        }
+
+        // Re-sort the master list
+        allPackages.sortWith(Comparator { p1, p2 ->
+            if (p1.isFrozen != p2.isFrozen) {
+                p1.isFrozen.compareTo(p2.isFrozen)
+            } else if (p1.isFrozen) {
+                p2.frozenTimestamp.compareTo(p1.frozenTimestamp) // Recently frozen first
+            } else {
+                p1.appName.compareTo(p2.appName, ignoreCase = true)
+            }
+        })
+        
+        updateFilter(currentMode)
+        return 0 // Index doesn't matter much as we re-filter everything
     }
 }

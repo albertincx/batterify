@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -31,11 +32,14 @@ class RunningPackagesFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var refreshButton: Button
     private lateinit var freezeButton: Button
+    private lateinit var copyButton: Button
     private lateinit var accessibilityButton: Button
     private lateinit var usageStatsButton: Button
     private lateinit var selectAllCheckBox: CheckBox
     private lateinit var selectActiveCheckBox: CheckBox
     private lateinit var tabLayout: TabLayout
+    private lateinit var filterEditText: EditText
+    private lateinit var filterButton: Button
     private lateinit var adapter: RunningPackagesAdapter
     private var isInitialLoad = true
 
@@ -49,11 +53,14 @@ class RunningPackagesFragment : Fragment() {
         recyclerView = root.findViewById(R.id.runningPackagesRecyclerView)
         refreshButton = root.findViewById(R.id.refresh_button)
         freezeButton = root.findViewById(R.id.freeze_button)
+        copyButton = root.findViewById(R.id.copy_selected_button)
         accessibilityButton = root.findViewById(R.id.accessibility_button)
         usageStatsButton = root.findViewById(R.id.usage_stats_button)
         selectAllCheckBox = root.findViewById(R.id.selectAllCheckBox)
         selectActiveCheckBox = root.findViewById(R.id.selectActiveCheckBox)
         tabLayout = root.findViewById(R.id.tabLayout)
+        filterEditText = root.findViewById(R.id.filterEditText)
+        filterButton = root.findViewById(R.id.filter_button)
 
         recyclerView.layoutManager = LinearLayoutManager(context)
 
@@ -64,6 +71,14 @@ class RunningPackagesFragment : Fragment() {
 
         freezeButton.setOnClickListener {
             freezeSelectedPackages()
+        }
+
+        copyButton.setOnClickListener {
+            copySelectedPackages()
+        }
+
+        filterButton.setOnClickListener {
+            applyCurrentFilter()
         }
 
         accessibilityButton.setOnClickListener {
@@ -95,6 +110,18 @@ class RunningPackagesFragment : Fragment() {
                     adapter.updateFilter(position)
                     updateSelectActiveVisibility()
                     
+                    // Show filter for all tabs except history
+                    val filterLayout = root.findViewById<View>(R.id.filter_layout)
+                    if (position == 2) { // History
+                        filterLayout.visibility = View.GONE
+                    } else {
+                        filterLayout.visibility = View.VISIBLE
+                        // Load saved filter for this tab
+                        val savedFilter = getSavedFilterForTab(position)
+                        filterEditText.setText(savedFilter)
+                        adapter.setFilter(savedFilter)
+                    }
+
                     // Specific logic for History vs Others
                     if (position == 2) { // History
                         root.findViewById<View>(R.id.controls_layout).visibility = View.GONE
@@ -117,6 +144,25 @@ class RunningPackagesFragment : Fragment() {
         observeFreezeStatus()
 
         return root
+    }
+
+    private fun applyCurrentFilter() {
+        if (::adapter.isInitialized) {
+            val filter = filterEditText.text.toString()
+            val currentTab = tabLayout.selectedTabPosition
+            saveFilterForTab(currentTab, filter)
+            adapter.setFilter(filter)
+        }
+    }
+
+    private fun saveFilterForTab(tabIndex: Int, filter: String) {
+        val prefs = requireContext().getSharedPreferences("tab_filters", Context.MODE_PRIVATE)
+        prefs.edit().putString("filter_tab_$tabIndex", filter).apply()
+    }
+
+    private fun getSavedFilterForTab(tabIndex: Int): String {
+        val prefs = requireContext().getSharedPreferences("tab_filters", Context.MODE_PRIVATE)
+        return prefs.getString("filter_tab_$tabIndex", "") ?: ""
     }
 
     private fun observeFreezeStatus() {
@@ -148,19 +194,19 @@ class RunningPackagesFragment : Fragment() {
     private fun updatePermissionStatuses() {
         val accessibilityEnabled = isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)
         if (accessibilityEnabled) {
-            accessibilityButton.text = "Accessibility On"
+            accessibilityButton.text = "Access On"
             accessibilityButton.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
         } else {
-            accessibilityButton.text = "Accessibility Off"
+            accessibilityButton.text = "Access Off"
             accessibilityButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
         }
 
         val usageStatsEnabled = RunningPackageHelper.hasUsageStatsPermission(requireContext())
         if (usageStatsEnabled) {
-            usageStatsButton.text = "Usage Stats On"
+            usageStatsButton.text = "Stats On"
             usageStatsButton.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
         } else {
-            usageStatsButton.text = "Usage Stats Off"
+            usageStatsButton.text = "Stats Off"
             usageStatsButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
         }
     }
@@ -196,7 +242,14 @@ class RunningPackagesFragment : Fragment() {
             }
         )
         recyclerView.adapter = adapter
-        adapter.updateFilter(tabLayout.selectedTabPosition)
+        val currentTab = tabLayout.selectedTabPosition
+        adapter.updateFilter(currentTab)
+        
+        // Re-apply saved filter for this tab
+        val savedFilter = getSavedFilterForTab(currentTab)
+        filterEditText.setText(savedFilter)
+        adapter.setFilter(savedFilter)
+
         updateSelectActiveVisibility()
         updateFreezeButtonVisibility()
         
@@ -223,7 +276,9 @@ class RunningPackagesFragment : Fragment() {
 
     private fun updateFreezeButtonVisibility() {
         if (::adapter.isInitialized) {
-            freezeButton.visibility = if (adapter.getSelectedPackages().isNotEmpty()) View.VISIBLE else View.GONE
+            val hasSelected = adapter.getSelectedPackages().isNotEmpty()
+            freezeButton.visibility = if (hasSelected) View.VISIBLE else View.GONE
+            copyButton.visibility = if (hasSelected) View.VISIBLE else View.GONE
         }
     }
 
@@ -271,6 +326,19 @@ class RunningPackagesFragment : Fragment() {
             requireContext().startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(context, "Could not open app info", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun copySelectedPackages() {
+        if (::adapter.isInitialized) {
+            val selected = adapter.getSelectedPackages()
+            if (selected.isNotEmpty()) {
+                val packageNames = selected.joinToString("\n") { it.packageName }
+                val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("package names", packageNames)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(context, "Copied ${selected.size} package names", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }

@@ -21,7 +21,7 @@ import com.example.appsapp.HistoryItem
 class RunningPackagesAdapter(
     private val context: Context,
     private val allPackages: MutableList<RunningPackage>,
-    private var allUserPackages: List<RunningPackage> = emptyList(),
+    private var allUserPackages: MutableList<RunningPackage> = mutableListOf(),
     private val onKillClick: (RunningPackage) -> Unit,
     private val onInfoClick: (RunningPackage) -> Unit,
     private val onSelectionChanged: () -> Unit
@@ -29,26 +29,55 @@ class RunningPackagesAdapter(
 
     private var filteredPackages: List<Any> = emptyList()
     private var currentMode: Int = 0 // 0: All, 1: Hidden, 2: History, 3: Installed
+    private var filterPattern: Regex? = null
 
     init {
         updateFilter(0)
     }
 
     fun setUserPackages(packages: List<RunningPackage>) {
-        allUserPackages = packages
+        allUserPackages = packages.toMutableList()
         if (currentMode == 3) {
             updateFilter(3)
         }
     }
 
+    fun setFilter(regex: String) {
+        filterPattern = try {
+            if (regex.isNotEmpty()) Regex(regex, RegexOption.IGNORE_CASE) else null
+        } catch (e: Exception) {
+            null
+        }
+        updateFilter(currentMode)
+    }
+
     fun updateFilter(mode: Int) {
         currentMode = mode
-        filteredPackages = when (mode) {
+        val baseList = when (mode) {
             0 -> allPackages.filter { !it.isHidden }
-            1 -> allPackages.filter { it.isHidden }
+            1 -> {
+                // Show all hidden apps (from both running and full list)
+                val hiddenInRunning = allPackages.filter { it.isHidden }
+                val hiddenInUser = allUserPackages.filter { it.isHidden }
+                (hiddenInRunning + hiddenInUser).distinctBy { it.packageName }
+            }
             2 -> HistoryHelper.getHistory(context)
-            3 -> allUserPackages
+            3 -> allUserPackages.filter { !it.isHidden }
             else -> emptyList()
+        }
+
+        filteredPackages = if (filterPattern != null && mode != 2) {
+            baseList.filter { item ->
+                if (item is RunningPackage) {
+                    // Exclude if matches
+                    !(filterPattern!!.containsMatchIn(item.packageName) || 
+                      filterPattern!!.containsMatchIn(item.appName))
+                } else {
+                    true
+                }
+            }
+        } else {
+            baseList
         }
         notifyDataSetChanged()
     }
@@ -152,13 +181,17 @@ class RunningPackagesAdapter(
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> { // Hide/Unhide
-                    if (runningPackage.isHidden) {
-                        RunningPackageHelper.unhidePackage(context, runningPackage.packageName)
-                        runningPackage.isHidden = false
-                    } else {
+                    val targetHidden = !runningPackage.isHidden
+                    if (targetHidden) {
                         RunningPackageHelper.hidePackage(context, runningPackage.packageName)
-                        runningPackage.isHidden = true
+                    } else {
+                        RunningPackageHelper.unhidePackage(context, runningPackage.packageName)
                     }
+                    
+                    // Sync status in both master lists
+                    allPackages.find { it.packageName == runningPackage.packageName }?.isHidden = targetHidden
+                    allUserPackages.find { it.packageName == runningPackage.packageName }?.isHidden = targetHidden
+                    
                     updateFilter(currentMode)
                     onSelectionChanged()
                     true
@@ -246,8 +279,8 @@ class RunningPackagesAdapter(
     fun hasActivePackages(): Boolean {
         return when (currentMode) {
             0 -> allPackages.any { !it.isFrozen && !it.isHidden }
-            1 -> allPackages.any { !it.isFrozen && it.isHidden }
-            3 -> allUserPackages.any { !it.isFrozen }
+            1 -> (allPackages + allUserPackages).any { !it.isFrozen && it.isHidden }
+            3 -> allUserPackages.any { !it.isFrozen && !it.isHidden }
             else -> false
         }
     }
@@ -267,6 +300,17 @@ class RunningPackagesAdapter(
             pkg.isSelected = false
             pkg.frozenTimestamp = System.currentTimeMillis()
         }
+
+        // Re-sort user apps list
+        allUserPackages.sortWith(Comparator { p1, p2 ->
+            if (p1.isFrozen != p2.isFrozen) {
+                p1.isFrozen.compareTo(p2.isFrozen)
+            } else if (p1.isFrozen) {
+                p2.frozenTimestamp.compareTo(p1.frozenTimestamp) // Recently frozen first
+            } else {
+                p1.appName.compareTo(p2.appName, ignoreCase = true)
+            }
+        })
 
         // Re-sort the master list
         allPackages.sortWith(Comparator { p1, p2 ->

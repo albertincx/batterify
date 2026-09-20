@@ -40,14 +40,15 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="8dp"
+        android:padding="4dp"
         app:layout_constraintTop_toBottomOf="@+id/tabLayout">
 
         <CheckBox
             android:id="@+id/selectAllCheckBox"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Select All" />
+            android:text="All"
+            android:textSize="12sp" />
 
         <View
             android:layout_width="0dp"
@@ -56,19 +57,60 @@
 
         <Button
             android:id="@+id/usage_stats_button"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Usage Stats Off"
-            android:textColor="?attr/colorError" />
+            android:paddingHorizontal="4dp"
+            android:text="Stats Off"
+            android:textColor="?attr/colorError"
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/accessibility_button"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Accessibility Off"
-            android:textColor="?attr/colorError" />
+            android:paddingHorizontal="4dp"
+            android:text="Access Off"
+            android:textColor="?attr/colorError"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/filter_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@+id/controls_layout">
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Exclude package regex"
+            app:endIconMode="clear_text">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/filterEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:textSize="14sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <Button
+            android:id="@+id/filter_button"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Filter"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -82,7 +124,7 @@
         app:layout_constraintBottom_toTopOf="@+id/bottom_buttons"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/controls_layout" />
+        app:layout_constraintTop_toBottomOf="@+id/filter_layout" />
 
     <LinearLayout
         android:id="@+id/bottom_buttons"
@@ -90,30 +132,44 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="8dp"
+        android:padding="4dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <CheckBox
             android:id="@+id/selectActiveCheckBox"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:text="Select Active"
+            android:text="Active"
+            android:textSize="12sp"
             android:visibility="gone" />
 
         <Button
             android:id="@+id/refresh_button"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:text="Refresh" />
+            android:layout_marginEnd="4dp"
+            android:text="Refresh"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/copy_selected_button"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:text="Copy"
+            android:textSize="12sp"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/freeze_button"
+            style="@style/Widget.Material3.Button"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Force Kill"
+            android:textSize="12sp"
             android:visibility="gone" />
     </LinearLayout>
 

@@ -222,7 +222,13 @@ class RunningPackageHelper {
                 }
             }
 
-            return userPackages.sortedBy { it.appName.lowercase() }
+            return userPackages.sortedWith(Comparator { p1, p2 ->
+                if (p1.isFrozen != p2.isFrozen) {
+                    p1.isFrozen.compareTo(p2.isFrozen) // Running (false/0) first
+                } else {
+                    p1.appName.compareTo(p2.appName, ignoreCase = true)
+                }
+            })
         }
     }
 }

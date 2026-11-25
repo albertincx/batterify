@@ -99,7 +99,6 @@ class RunningPackagesFragment : Fragment() {
                 updatePermissionStatuses()
             }
         }
-        }
 
         accessibilityButton.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)

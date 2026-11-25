@@ -128,12 +128,14 @@ class FreezeAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         AccessibilityTileService.requestUpdate(this)
+        FloatingButtonService.updateFloatingButtonState()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         AccessibilityTileService.requestUpdate(this)
+        FloatingButtonService.updateFloatingButtonState()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {

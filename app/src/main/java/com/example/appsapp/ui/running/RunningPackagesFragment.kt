@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.appsapp.FreezeAccessibilityService
 import com.example.appsapp.FreezeStatusObserver
+import com.example.appsapp.FloatingButtonService
 import com.example.appsapp.RunningPackageHelper
 import com.example.appsapp.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -32,6 +33,7 @@ class RunningPackagesFragment : Fragment() {
     private lateinit var copyButton: Button
     private lateinit var accessibilityButton: Button
     private lateinit var usageStatsButton: Button
+    private lateinit var overlayButton: Button
     private lateinit var selectAllCheckBox: CheckBox
     private lateinit var selectActiveCheckBox: CheckBox
     private lateinit var tabLayout: TabLayout

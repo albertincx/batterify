@@ -137,6 +137,11 @@ class RunningPackagesAdapter(
         holder.packageCheckBox.setOnCheckedChangeListener { _, isChecked ->
             if (!runningPackage.isFrozen) {
                 runningPackage.isSelected = isChecked
+                if (currentMode == 1) {
+                    RunningPackageHelper.setPackageHiddenMarked(context, runningPackage.packageName, isChecked)
+                    allPackages.find { it.packageName == runningPackage.packageName }?.isSelected = isChecked
+                    allUserPackages.find { it.packageName == runningPackage.packageName }?.isSelected = isChecked
+                }
                 onSelectionChanged()
             }
         }
@@ -189,8 +194,14 @@ class RunningPackagesAdapter(
                     }
                     
                     // Sync status in both master lists
-                    allPackages.find { it.packageName == runningPackage.packageName }?.isHidden = targetHidden
-                    allUserPackages.find { it.packageName == runningPackage.packageName }?.isHidden = targetHidden
+                    allPackages.find { it.packageName == runningPackage.packageName }?.let {
+                        it.isHidden = targetHidden
+                        if (!targetHidden) it.isSelected = false
+                    }
+                    allUserPackages.find { it.packageName == runningPackage.packageName }?.let {
+                        it.isHidden = targetHidden
+                        if (!targetHidden) it.isSelected = false
+                    }
                     
                     updateFilter(currentMode)
                     onSelectionChanged()
@@ -246,23 +257,49 @@ class RunningPackagesAdapter(
     override fun getItemCount(): Int = filteredPackages.size
     
     fun selectAll(select: Boolean) {
+        val changedPackages = mutableListOf<String>()
         filteredPackages.forEach { 
             if (it is RunningPackage && !it.isFrozen) {
-                it.isSelected = select 
+                it.isSelected = select
+                changedPackages.add(it.packageName)
             }
+        }
+        if (currentMode == 1 && changedPackages.isNotEmpty()) {
+            RunningPackageHelper.setPackagesHiddenMarked(context, changedPackages, select)
+            syncSelectionInLists(changedPackages, select)
         }
         notifyDataSetChanged()
         onSelectionChanged()
     }
 
     fun selectAllActive(select: Boolean) {
+        val changedPackages = mutableListOf<String>()
         filteredPackages.forEach { 
             if (it is RunningPackage && !it.isFrozen && !it.isHidden) {
-                it.isSelected = select 
+                it.isSelected = select
+                changedPackages.add(it.packageName)
             }
+        }
+        if (currentMode == 1 && changedPackages.isNotEmpty()) {
+            RunningPackageHelper.setPackagesHiddenMarked(context, changedPackages, select)
+            syncSelectionInLists(changedPackages, select)
         }
         notifyDataSetChanged()
         onSelectionChanged()
+    }
+
+    private fun syncSelectionInLists(packageNames: Collection<String>, isSelected: Boolean) {
+        val packageSet = packageNames.toSet()
+        allPackages.forEach {
+            if (it.packageName in packageSet && !it.isFrozen) {
+                it.isSelected = isSelected
+            }
+        }
+        allUserPackages.forEach {
+            if (it.packageName in packageSet && !it.isFrozen) {
+                it.isSelected = isSelected
+            }
+        }
     }
 
     fun getSelectedPackages(): List<RunningPackage> {

@@ -21,9 +21,11 @@ class RunningPackageHelper {
     companion object {
         private const val PREFS_NAME = "batterify_prefs"
         private const val HIDDEN_PACKAGES_KEY = "hidden_packages"
+        private const val HIDDEN_MARKED_PACKAGES_KEY = "hidden_marked_packages"
 
         fun getRunningPackages(context: Context): List<RunningPackage> {
             val hiddenPackages = getHiddenPackages(context)
+            val hiddenMarkedPackages = getHiddenMarkedPackages(context)
             val runningPackages = mutableListOf<RunningPackage>()
             
             // Check if we have usage stats permission
@@ -47,6 +49,7 @@ class RunningPackageHelper {
                     mostRecentStats.forEach { usageStat ->
                         if (!isSystemPackage(usageStat.packageName, context.packageName)) {
                             val isFrozen = isPackageStopped(context, usageStat.packageName)
+                            val isHidden = hiddenPackages.contains(usageStat.packageName)
                             runningPackages.add(
                                 RunningPackage(
                                     packageName = usageStat.packageName,
@@ -54,9 +57,10 @@ class RunningPackageHelper {
                                     processId = -1, // UsageStats doesn't provide PID
                                     appName = getApplicationLabel(context, usageStat.packageName),
                                     isVisible = true,
+                                    isSelected = !isFrozen && isHidden && hiddenMarkedPackages.contains(usageStat.packageName),
                                     isFrozen = isFrozen,
                                     frozenTimestamp = if (isFrozen) 1L else 0L, // Placeholder for existing frozen apps
-                                    isHidden = hiddenPackages.contains(usageStat.packageName)
+                                    isHidden = isHidden
                                 )
                             )
                         }
@@ -64,6 +68,7 @@ class RunningPackageHelper {
                 }
             } else {
                 // Fallback: just add the current app
+                val isHidden = hiddenPackages.contains(context.packageName)
                 runningPackages.add(
                     RunningPackage(
                         packageName = context.packageName,
@@ -71,8 +76,9 @@ class RunningPackageHelper {
                         processId = android.os.Process.myPid(),
                         appName = getApplicationLabel(context, context.packageName),
                         isVisible = true,
+                        isSelected = isHidden && hiddenMarkedPackages.contains(context.packageName),
                         isFrozen = false, // Current app is obviously running
-                        isHidden = hiddenPackages.contains(context.packageName)
+                        isHidden = isHidden
                     )
                 )
             }
@@ -87,6 +93,7 @@ class RunningPackageHelper {
                     // Only add if not already in the list from usage stats
                     if (!runningPackages.any { it.packageName == packageName }) {
                         val isFrozen = isPackageStopped(context, packageName)
+                        val isHidden = hiddenPackages.contains(packageName)
                         runningPackages.add(
                             RunningPackage(
                                 packageName = packageName,
@@ -94,9 +101,10 @@ class RunningPackageHelper {
                                 processId = processInfo.pid,
                                 appName = getApplicationLabel(context, packageName),
                                 isVisible = true,
+                                isSelected = !isFrozen && isHidden && hiddenMarkedPackages.contains(packageName),
                                 isFrozen = isFrozen,
                                 frozenTimestamp = if (isFrozen) 1L else 0L,
-                                isHidden = hiddenPackages.contains(packageName)
+                                isHidden = isHidden
                             )
                         )
                     }
@@ -181,16 +189,47 @@ class RunningPackageHelper {
             val hidden = getHiddenPackages(context).toMutableSet()
             hidden.remove(packageName)
             saveHiddenPackages(context, hidden)
+            setPackageHiddenMarked(context, packageName, false)
         }
 
         private fun getHiddenPackages(context: Context): Set<String> {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            return prefs.getStringSet(HIDDEN_PACKAGES_KEY, emptySet()) ?: emptySet()
+            return prefs.getStringSet(HIDDEN_PACKAGES_KEY, emptySet())?.toSet() ?: emptySet()
         }
 
         private fun saveHiddenPackages(context: Context, packages: Set<String>) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().putStringSet(HIDDEN_PACKAGES_KEY, packages).apply()
+            prefs.edit().putStringSet(HIDDEN_PACKAGES_KEY, packages.toSet()).apply()
+        }
+
+        fun getHiddenMarkedPackages(context: Context): Set<String> {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getStringSet(HIDDEN_MARKED_PACKAGES_KEY, emptySet())?.toSet() ?: emptySet()
+        }
+
+        fun setPackageHiddenMarked(context: Context, packageName: String, isMarked: Boolean) {
+            val marked = getHiddenMarkedPackages(context).toMutableSet()
+            if (isMarked) {
+                marked.add(packageName)
+            } else {
+                marked.remove(packageName)
+            }
+            saveHiddenMarkedPackages(context, marked)
+        }
+
+        fun setPackagesHiddenMarked(context: Context, packageNames: Collection<String>, isMarked: Boolean) {
+            val marked = getHiddenMarkedPackages(context).toMutableSet()
+            if (isMarked) {
+                marked.addAll(packageNames)
+            } else {
+                marked.removeAll(packageNames.toSet())
+            }
+            saveHiddenMarkedPackages(context, marked)
+        }
+
+        private fun saveHiddenMarkedPackages(context: Context, packages: Set<String>) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putStringSet(HIDDEN_MARKED_PACKAGES_KEY, packages.toSet()).apply()
         }
 
         fun getAllUserPackages(context: Context): List<RunningPackage> {
@@ -198,6 +237,7 @@ class RunningPackageHelper {
             val installedPackages = packageManager.getInstalledPackages(0)
             val userPackages = mutableListOf<RunningPackage>()
             val hiddenPackages = getHiddenPackages(context)
+            val hiddenMarkedPackages = getHiddenMarkedPackages(context)
 
             installedPackages.forEach { packageInfo ->
                 val ai = packageInfo.applicationInfo ?: return@forEach
@@ -207,6 +247,7 @@ class RunningPackageHelper {
 
                 if ((!isSystem || isUpdatedSystem) && packageInfo.packageName != context.packageName) {
                     val isFrozen = isPackageStopped(context, packageInfo.packageName)
+                    val isHidden = hiddenPackages.contains(packageInfo.packageName)
                     userPackages.add(
                         RunningPackage(
                             packageName = packageInfo.packageName,
@@ -214,9 +255,10 @@ class RunningPackageHelper {
                             processId = -1,
                             appName = ai.loadLabel(packageManager).toString(),
                             isVisible = true,
+                            isSelected = !isFrozen && isHidden && hiddenMarkedPackages.contains(packageInfo.packageName),
                             isFrozen = isFrozen,
                             frozenTimestamp = if (isFrozen) 1L else 0L,
-                            isHidden = hiddenPackages.contains(packageInfo.packageName)
+                            isHidden = isHidden
                         )
                     )
                 }

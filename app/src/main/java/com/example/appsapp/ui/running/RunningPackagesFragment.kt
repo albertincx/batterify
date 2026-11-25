@@ -1,7 +1,5 @@
 package com.example.appsapp.ui.running
 
-import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -9,7 +7,6 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.accessibility.AccessibilityManager
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -192,7 +189,7 @@ class RunningPackagesFragment : Fragment() {
     }
 
     private fun updatePermissionStatuses() {
-        val accessibilityEnabled = isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)
+        val accessibilityEnabled = FreezeAccessibilityService.isEnabled(requireContext())
         if (accessibilityEnabled) {
             accessibilityButton.text = "Access On"
             accessibilityButton.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
@@ -209,18 +206,6 @@ class RunningPackagesFragment : Fragment() {
             usageStatsButton.text = "Stats Off"
             usageStatsButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
         }
-    }
-
-    private fun isAccessibilityServiceEnabled(context: Context, service: Class<out AccessibilityService>): Boolean {
-        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
-        for (enabledService in enabledServices) {
-            val enabledServiceInfo = enabledService.resolveInfo.serviceInfo
-            if (enabledServiceInfo.packageName == context.packageName && enabledServiceInfo.name == service.name) {
-                return true
-            }
-        }
-        return false
     }
 
     private fun loadRunningPackages() {
@@ -297,7 +282,7 @@ class RunningPackagesFragment : Fragment() {
     }
 
     private fun freezeSelectedPackages(isMenuFreeze: Boolean = false) {
-        if (!isAccessibilityServiceEnabled(requireContext(), FreezeAccessibilityService::class.java)) {
+        if (!FreezeAccessibilityService.isEnabled(requireContext())) {
             Toast.makeText(context, "Please enable Accessibility Service first", Toast.LENGTH_LONG).show()
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)

@@ -1,6 +1,7 @@
 package com.example.appsapp
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,6 +12,7 @@ import android.os.Message
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import java.util.concurrent.LinkedBlockingQueue
@@ -111,16 +113,27 @@ class FreezeAccessibilityService : AccessibilityService() {
                 instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
             }
         }
+
+        fun isEnabled(context: Context): Boolean {
+            val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+            val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
+            return enabledServices.any { enabledService ->
+                val info = enabledService.resolveInfo.serviceInfo
+                info.packageName == context.packageName && info.name == FreezeAccessibilityService::class.java.name
+            }
+        }
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        AccessibilityTileService.requestUpdate(this)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        AccessibilityTileService.requestUpdate(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {

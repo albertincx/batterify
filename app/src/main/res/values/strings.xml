@@ -13,4 +13,7 @@
     <string name="settings_last_action_time">Action Delay (ms)</string>
     <string name="settings_return_time">Return Delay (ms)</string>
     <string name="settings_next_time">Next App Delay (ms)</string>
+    <string name="tile_accessibility_label">Batterify Access</string>
+    <string name="tile_accessibility_on">On</string>
+    <string name="tile_accessibility_off">Off</string>
 </resources>

@@ -55,6 +55,7 @@ class RunningPackagesFragment : Fragment() {
         copyButton = root.findViewById(R.id.copy_selected_button)
         accessibilityButton = root.findViewById(R.id.accessibility_button)
         usageStatsButton = root.findViewById(R.id.usage_stats_button)
+        overlayButton = root.findViewById(R.id.overlay_button)
         selectAllCheckBox = root.findViewById(R.id.selectAllCheckBox)
         selectActiveCheckBox = root.findViewById(R.id.selectActiveCheckBox)
         tabLayout = root.findViewById(R.id.tabLayout)
@@ -78,6 +79,26 @@ class RunningPackagesFragment : Fragment() {
 
         filterButton.setOnClickListener {
             applyCurrentFilter()
+        }
+
+        overlayButton.setOnClickListener {
+            val ctx = requireContext()
+            if (!FloatingButtonService.isOverlayPermissionGranted(ctx)) {
+                Toast.makeText(ctx, "Grant Overlay permission for floating button", Toast.LENGTH_LONG).show()
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:${ctx.packageName}")
+                )
+                startActivity(intent)
+            } else {
+                if (FloatingButtonService.isRunning(ctx)) {
+                    FloatingButtonService.stopService(ctx)
+                } else {
+                    FloatingButtonService.startService(ctx)
+                }
+                updatePermissionStatuses()
+            }
+        }
         }
 
         accessibilityButton.setOnClickListener {
@@ -207,6 +228,19 @@ class RunningPackagesFragment : Fragment() {
         } else {
             usageStatsButton.text = "Stats Off"
             usageStatsButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
+        }
+
+        val overlayPermission = FloatingButtonService.isOverlayPermissionGranted(requireContext())
+        val overlayRunning = FloatingButtonService.isRunning(requireContext())
+        if (overlayRunning) {
+            overlayButton.text = "Float On"
+            overlayButton.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
+        } else if (overlayPermission) {
+            overlayButton.text = "Float Off"
+            overlayButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
+        } else {
+            overlayButton.text = "Float Perm"
+            overlayButton.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
         }
     }
 

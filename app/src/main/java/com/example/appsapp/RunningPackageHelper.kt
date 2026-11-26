@@ -14,7 +14,8 @@ data class RunningPackage(
     var isSelected: Boolean = false,
     var isFrozen: Boolean = false,
     var frozenTimestamp: Long = 0L,
-    var isHidden: Boolean = false
+    var isHidden: Boolean = false,
+    var lastTimeUsed: Long = 0L
 )
 
 class RunningPackageHelper {
@@ -60,7 +61,8 @@ class RunningPackageHelper {
                                     isSelected = !isFrozen && isHidden && hiddenMarkedPackages.contains(usageStat.packageName),
                                     isFrozen = isFrozen,
                                     frozenTimestamp = if (isFrozen) 1L else 0L, // Placeholder for existing frozen apps
-                                    isHidden = isHidden
+                                    isHidden = isHidden,
+                                    lastTimeUsed = usageStat.lastTimeUsed
                                 )
                             )
                         }
@@ -78,7 +80,8 @@ class RunningPackageHelper {
                         isVisible = true,
                         isSelected = isHidden && hiddenMarkedPackages.contains(context.packageName),
                         isFrozen = false, // Current app is obviously running
-                        isHidden = isHidden
+                        isHidden = isHidden,
+                        lastTimeUsed = System.currentTimeMillis()
                     )
                 )
             }
@@ -118,7 +121,8 @@ class RunningPackageHelper {
                     } else if (p1.isFrozen) {
                         p2.frozenTimestamp.compareTo(p1.frozenTimestamp) // Recently frozen first
                     } else {
-                        p1.appName.compareTo(p2.appName, ignoreCase = true) // Alphabetical for running
+                        val timeCompare = p2.lastTimeUsed.compareTo(p1.lastTimeUsed) // Newest running first
+                        if (timeCompare != 0) timeCompare else p1.appName.compareTo(p2.appName, ignoreCase = true)
                     }
                 })
         }

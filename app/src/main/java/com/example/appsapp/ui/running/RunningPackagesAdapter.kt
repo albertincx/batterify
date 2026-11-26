@@ -352,11 +352,12 @@ class RunningPackagesAdapter(
         // Re-sort the master list
         allPackages.sortWith(Comparator { p1, p2 ->
             if (p1.isFrozen != p2.isFrozen) {
-                p1.isFrozen.compareTo(p2.isFrozen)
+                p1.isFrozen.compareTo(p2.isFrozen) // Running (false/0) first
             } else if (p1.isFrozen) {
                 p2.frozenTimestamp.compareTo(p1.frozenTimestamp) // Recently frozen first
             } else {
-                p1.appName.compareTo(p2.appName, ignoreCase = true)
+                val timeCompare = p2.lastTimeUsed.compareTo(p1.lastTimeUsed) // Newest running first
+                if (timeCompare != 0) timeCompare else p1.appName.compareTo(p2.appName, ignoreCase = true)
             }
         })
         

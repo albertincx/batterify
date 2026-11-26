@@ -37,8 +37,8 @@ class RunningPackagesAdapter(
 
     fun setUserPackages(packages: List<RunningPackage>) {
         allUserPackages = packages.toMutableList()
-        if (currentMode == 3) {
-            updateFilter(3)
+        if (currentMode == 1 || currentMode == 3) {
+            updateFilter(currentMode)
         }
     }
 
@@ -303,14 +303,14 @@ class RunningPackagesAdapter(
     }
 
     fun getSelectedPackages(): List<RunningPackage> {
-        val selected = mutableListOf<RunningPackage>()
-        allPackages.filter { it.isSelected && !it.isFrozen }.forEach { selected.add(it) }
-        allUserPackages.filter { it.isSelected && !it.isFrozen }.forEach { pkg ->
-            if (selected.none { it.packageName == pkg.packageName }) {
-                selected.add(pkg)
-            }
+        return when (currentMode) {
+            0 -> allPackages.filter { it.isSelected && !it.isFrozen && !it.isHidden }
+            1 -> (allPackages + allUserPackages)
+                .distinctBy { it.packageName }
+                .filter { it.isSelected && !it.isFrozen && it.isHidden }
+            3 -> allUserPackages.filter { it.isSelected && !it.isFrozen && !it.isHidden }
+            else -> emptyList()
         }
-        return selected
     }
 
     fun hasActivePackages(): Boolean {

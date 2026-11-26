@@ -22,8 +22,10 @@ import com.example.appsapp.RunningPackageHelper
 import com.example.appsapp.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class RunningPackagesFragment : Fragment() {
 
@@ -148,10 +150,11 @@ class RunningPackagesFragment : Fragment() {
                     } else {
                         root.findViewById<View>(R.id.controls_layout).visibility = View.VISIBLE
                         root.findViewById<View>(R.id.bottom_buttons).visibility = View.VISIBLE
-                        if (position == 3) { // Installed
+                        if (position == 1 || position == 3) { // Hidden or Installed
                             loadAllUserPackages()
                         }
                     }
+                    updateFreezeButtonVisibility()
                 }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
@@ -273,7 +276,7 @@ class RunningPackagesFragment : Fragment() {
         updateSelectActiveVisibility()
         updateFreezeButtonVisibility()
         
-        if (tabLayout.selectedTabPosition == 3) {
+        if (currentTab == 1 || currentTab == 3) {
             loadAllUserPackages()
         }
 
@@ -287,17 +290,24 @@ class RunningPackagesFragment : Fragment() {
 
     private fun loadAllUserPackages() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val userPackages = RunningPackageHelper.getAllUserPackages(requireContext())
+            val ctx = context ?: return@launch
+            val userPackages = withContext(Dispatchers.IO) {
+                RunningPackageHelper.getAllUserPackages(ctx)
+            }
             if (::adapter.isInitialized) {
                 adapter.setUserPackages(userPackages)
+                updateSelectActiveVisibility()
+                updateFreezeButtonVisibility()
             }
         }
     }
 
     private fun updateFreezeButtonVisibility() {
         if (::adapter.isInitialized) {
-            val hasSelected = adapter.getSelectedPackages().isNotEmpty()
+            val selectedCount = adapter.getSelectedPackages().size
+            val hasSelected = selectedCount > 0
             freezeButton.visibility = if (hasSelected) View.VISIBLE else View.GONE
+            freezeButton.text = if (hasSelected) "Force Kill ($selectedCount)" else "Force Kill"
             copyButton.visibility = if (hasSelected) View.VISIBLE else View.GONE
         }
     }

@@ -16,4 +16,6 @@
     <string name="tile_accessibility_label">Batterify Access</string>
     <string name="tile_accessibility_on">On</string>
     <string name="tile_accessibility_off">Off</string>
+    <string name="settings_export_config">Export Settings</string>
+    <string name="settings_import_config">Import Settings</string>
 </resources>

@@ -10,16 +10,20 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
@@ -166,11 +170,20 @@ class FloatingButtonService : Service(), AccessibilityManager.AccessibilityState
     }
 
     private fun setupTouchAndClickListener(view: View?, params: WindowManager.LayoutParams) {
+        val handler = Handler(Looper.getMainLooper())
+        val longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
+
         view?.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
             private var initialTouchX = 0f
             private var initialTouchY = 0f
+            private var longPressTriggered = false
+
+            private val longPressRunnable = Runnable {
+                longPressTriggered = true
+                freezeHiddenMarkedPackages()
+            }
 
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 when (event.action) {
@@ -179,26 +192,56 @@ class FloatingButtonService : Service(), AccessibilityManager.AccessibilityState
                         initialY = params.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
+                        longPressTriggered = false
+                        handler.postDelayed(longPressRunnable, longPressTimeout)
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
+                        val diffX = abs(event.rawX - initialTouchX)
+                        val diffY = abs(event.rawY - initialTouchY)
+                        if (diffX >= 10 || diffY >= 10) {
+                            handler.removeCallbacks(longPressRunnable)
+                        }
                         params.x = initialX + (event.rawX - initialTouchX).toInt()
                         params.y = initialY + (event.rawY - initialTouchY).toInt()
                         windowManager?.updateViewLayout(floatingView, params)
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
+                        handler.removeCallbacks(longPressRunnable)
                         val diffX = abs(event.rawX - initialTouchX)
                         val diffY = abs(event.rawY - initialTouchY)
-                        if (diffX < 10 && diffY < 10) {
+                        if (!longPressTriggered && diffX < 10 && diffY < 10) {
                             openAccessibilitySettings()
                         }
+                        return true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        handler.removeCallbacks(longPressRunnable)
                         return true
                     }
                 }
                 return false
             }
         })
+    }
+
+    private fun freezeHiddenMarkedPackages() {
+        if (!FreezeAccessibilityService.isEnabled(this)) {
+            Toast.makeText(this, "Please enable Accessibility Service first", Toast.LENGTH_LONG).show()
+            openAccessibilitySettings()
+            return
+        }
+
+        val markedPackages = RunningPackageHelper.getHiddenMarkedPackages(this)
+        val activeMarked = markedPackages.filter { !RunningPackageHelper.isPackageStopped(this, it) }
+        if (activeMarked.isEmpty()) {
+            Toast.makeText(this, "No active hidden marked packages", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Toast.makeText(this, "Stopping ${activeMarked.size} hidden apps...", Toast.LENGTH_SHORT).show()
+        FreezeAccessibilityService.startFreezing(this, activeMarked)
     }
 
     private fun openAccessibilitySettings() {
